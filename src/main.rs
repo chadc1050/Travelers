@@ -1,6 +1,9 @@
 use bevy::{app::{Startup, Update}, core_pipeline::core_2d::Camera2dBundle, ecs::component::Component, prelude::*};
+use components::{Dead, Health, Velocity};
 
 mod player;
+
+mod components;
 
 fn main() {
     info!("Starting Travelers...");
@@ -14,6 +17,7 @@ fn main() {
         }))
         .add_systems(Startup, setup)
         .add_systems(Update, movement_system)
+        .add_systems(Update, check_death)
         .add_plugins(player::PlayerPlugin)
         .run();
 }
@@ -38,22 +42,11 @@ fn movement_system(time: Res<Time>,mut query: Query<(&mut Transform, &Velocity)>
 	}
 }
 
-#[derive(Component)]
-pub struct Velocity {
-    pub dx: f32,
-    pub dy: f32
-}
+fn check_death(mut commands: Commands, query: Query<(Entity, &Health), Without<Dead>>) {
 
-#[derive(Component)]
-pub enum Direction {
-    Up,
-    Down,
-    Left,
-    Right
-}
-
-#[derive(Component)]
-pub struct Health {
-    pub current: u8,
-    pub max: u8
+    for (entity, health) in query.iter() {
+        if health.current <= 0 {
+            commands.entity(entity).insert(components::Dead);
+        }
+    }
 }

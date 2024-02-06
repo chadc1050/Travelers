@@ -1,6 +1,7 @@
-use bevy::{app::{prelude::*, App, Plugin}, asset::{AssetServer, Assets}, ecs::{component::Component, system::{adapter::info, Commands, Query, Res, ResMut}}, input::{keyboard::KeyCode, Input}, log::info, math::{Vec2, Vec3}, prelude::default, render::color::Color, sprite::{Sprite, SpriteBundle, TextureAtlas}, transform::{self, components::Transform}};
+use bevy::{app::{prelude::*, App, Plugin}, asset::{AssetServer, Assets}, ecs::{component::Component, system::{Commands, Query, Res, ResMut}}, input::{keyboard::KeyCode, Input}, log::info, math::{Vec2, Vec3}, prelude::default, render::color::Color, sprite::{Sprite, SpriteBundle, TextureAtlas}, transform::{self, components::Transform}};
 
-use crate::{Direction, Health, Velocity};
+use crate::components::{Direction, Health, Velocity};
+
 
 #[derive(Component)]
 pub struct Player {
