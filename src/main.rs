@@ -1,9 +1,11 @@
-use bevy::{app::{Startup, Update}, core_pipeline::core_2d::Camera2dBundle, ecs::component::Component, prelude::*};
+use bevy::{app::{Startup, Update}, core_pipeline::core_2d::Camera2dBundle, prelude::*};
 use components::{Dead, Health, Velocity};
 
 mod player;
 
 mod components;
+
+mod world;
 
 fn main() {
     info!("Starting Travelers...");
@@ -18,6 +20,7 @@ fn main() {
         .add_systems(Startup, setup)
         .add_systems(Update, movement_system)
         .add_systems(Update, check_death)
+        .add_plugins(world::WorldPlugin)
         .add_plugins(player::PlayerPlugin)
         .run();
 }
