@@ -1,0 +1,19 @@
+name: Linux Run Build and Tests
+
+on:
+ push:
+   branches: [master]
+ pull_request:
+   branches: [master]
+
+jobs:
+ build-bin:
+   runs-on: "ubuntu-latest"
+   steps:
+     - uses: actions/checkout@v2
+     - name: Prepare Toolchain
+       run: rustup show
+     - name: Build
+       run: cargo build --verbose
+     - name: Run Tests
+       run: cargo test --verbose
