@@ -1,6 +1,14 @@
-use std::{collections::{hash_map::DefaultHasher, HashMap}, hash::{Hash, Hasher}, io::ErrorKind};
+use std::{
+    collections::{hash_map::DefaultHasher, HashMap},
+    hash::{Hash, Hasher},
+    io::ErrorKind,
+};
 
-use bevy::{asset::{io::Reader, AssetLoader, AsyncReadExt, LoadContext}, prelude::*, transform::commands, utils::BoxedFuture};
+use bevy::{
+    asset::{io::Reader, AssetLoader, AsyncReadExt, LoadContext},
+    prelude::*,
+    utils::BoxedFuture,
+};
 use rand::{Rng, SeedableRng};
 use serde::Deserialize;
 
@@ -19,42 +27,41 @@ type Adjacencies = (Option<Chunk>, Option<Chunk>, Option<Chunk>, Option<Chunk>);
 pub struct WorldPlugin;
 
 impl Plugin for WorldPlugin {
-	fn build(&self, app: &mut App) {
+    fn build(&self, app: &mut App) {
         app.init_asset::<SchematicAsset>();
         app.init_asset_loader::<SchematicLoader>();
         app.add_systems(Startup, load_schematic);
         app.add_systems(Update, world_gen_system);
-        
     }
 }
 
 fn load_schematic(asset_server: Res<AssetServer>, mut commands: Commands) {
-
     info!("Loading world generation assets");
 
     let handle = asset_server.load("schematic.json");
     commands.insert_resource(SchematicResource(handle));
     // TODO: Load textures
-    
 }
 
 fn world_gen_system(
     mut commands: Commands,
     cam_pos: Query<&Transform, With<Camera>>,
-    chunks: Query<(Entity, &Chunk)>, 
+    chunks: Query<(Entity, &Chunk)>,
     asset_server: Res<AssetServer>,
-    assets: Res<Assets<SchematicAsset>>
+    assets: Res<Assets<SchematicAsset>>,
 ) {
-
-    info!("Updating world [Current Chunks: {}]", chunks.iter().collect::<Vec<_>>().len());
+    info!(
+        "Updating world [Current Chunks: {}]",
+        chunks.iter().collect::<Vec<_>>().len()
+    );
 
     // Retrieve assets
     if let Some(schematic_handle) = asset_server.get_handle::<SchematicAsset>("schematic.json") {
-
         debug!("Scematic loaded");
 
         // Get Chunks in range
-        let cam_coords = cam_pos.get_single()
+        let cam_coords = cam_pos
+            .get_single()
             .expect("Could not get camera position!")
             .translation;
 
@@ -73,16 +80,23 @@ fn world_gen_system(
                     break;
                 }
             }
-            
-            if !present {
 
-                info!("{}", format!("Found chunk needing to be generated ({},{})", in_range.0, in_range.1));
-                
-                let schematic = assets.get(&schematic_handle).expect("Error loading in schematic!");
+            if !present {
+                info!(
+                    "{}",
+                    format!(
+                        "Found chunk needing to be generated ({},{})",
+                        in_range.0, in_range.1
+                    )
+                );
+
+                let schematic = assets
+                    .get(&schematic_handle)
+                    .expect("Error loading in schematic!");
 
                 let wfc = WaveFunctionCollapse {
                     world_seed: 42,
-                    schematic: schematic.clone()
+                    schematic: schematic.clone(),
                 };
 
                 let to_spawn = wfc.collapse(in_range, &get_adjacent(in_range, &chunks));
@@ -93,15 +107,19 @@ fn world_gen_system(
                     sprite: Sprite {
                         color: Color::rgb(0., 0.4, 0.1),
                         custom_size: Some(Vec2::new(CHUNK_SIZE as f32, CHUNK_SIZE as f32)),
-                        
+
                         ..default()
                     },
                     ..default()
                 };
-                
-                commands.spawn(sprite)
-                    .insert(to_spawn.clone())
-                    .insert(Transform::from_translation(Vec3::new(to_spawn.coords.0 as f32, to_spawn.coords.1 as f32, 0.)));
+
+                commands.spawn(sprite).insert(to_spawn.clone()).insert(
+                    Transform::from_translation(Vec3::new(
+                        to_spawn.coords.0 as f32,
+                        to_spawn.coords.1 as f32,
+                        0.,
+                    )),
+                );
             }
         }
 
@@ -113,7 +131,7 @@ fn world_gen_system(
                     is_stale = false;
                     break;
                 }
-            } 
+            }
             if is_stale {
                 info!("Removing chunk that is no longer in range.");
                 commands.entity(entity).despawn();
@@ -123,8 +141,8 @@ fn world_gen_system(
 }
 
 fn get_adjacent(coords: &Coords, chunks: &Query<(Entity, &Chunk)>) -> Adjacencies {
-
-    let (mut north, mut east, mut south, mut west) = (Option::None, Option::None, Option::None, Option::None);
+    let (mut north, mut east, mut south, mut west) =
+        (Option::None, Option::None, Option::None, Option::None);
 
     for (_, chunk) in chunks.iter() {
         let to_check = chunk.coords;
@@ -143,7 +161,6 @@ fn get_adjacent(coords: &Coords, chunks: &Query<(Entity, &Chunk)>) -> Adjacencie
 }
 
 fn get_chunks_in_range(pos: (f32, f32)) -> Vec<Coords> {
-
     let offset_x = pos.0 as i64 / CHUNK_SIZE;
 
     let offset_y = pos.1 as i64 / CHUNK_SIZE;
@@ -152,20 +169,21 @@ fn get_chunks_in_range(pos: (f32, f32)) -> Vec<Coords> {
 
     for x in -RENDER_DISTANCE..=RENDER_DISTANCE {
         for y in -RENDER_DISTANCE..=RENDER_DISTANCE {
-            coords.push(((offset_x + x as i64) * CHUNK_SIZE, (offset_y + y as i64) * CHUNK_SIZE));
+            coords.push((
+                (offset_x + x as i64) * CHUNK_SIZE,
+                (offset_y + y as i64) * CHUNK_SIZE,
+            ));
         }
     }
 
     coords
 }
 
-
 #[derive(Resource)]
 pub struct SchematicResource(Handle<SchematicAsset>);
 
 #[derive(Asset, Clone, Debug, TypePath, Deserialize)]
 pub struct SchematicAsset {
-
     #[serde(flatten)]
     pub tiles: HashMap<String, TileSchematic>,
 }
@@ -181,14 +199,13 @@ pub struct TileSchematic {
     #[serde(rename = "2")]
     pub south: Vec<u8>,
     #[serde(rename = "3")]
-    pub west: Vec<u8>
+    pub west: Vec<u8>,
 }
 
 #[derive(Default)]
 pub struct SchematicLoader;
 
 impl AssetLoader for SchematicLoader {
-
     type Asset = SchematicAsset;
 
     type Settings = ();
@@ -196,22 +213,25 @@ impl AssetLoader for SchematicLoader {
     type Error = std::io::Error;
 
     fn load<'a>(
-        &'a self, reader: &'a mut Reader, 
-        _: &'a Self::Settings, 
+        &'a self,
+        reader: &'a mut Reader,
+        _: &'a Self::Settings,
         _: &'a mut LoadContext,
     ) -> BoxedFuture<'a, Result<Self::Asset, Self::Error>> {
-
         Box::pin(async move {
             let mut bytes = Vec::new();
             _ = reader.read_to_end(&mut bytes).await;
             let serialized = serde_json::from_slice::<SchematicAsset>(&bytes);
-    
+
             match serialized {
                 Ok(data) => {
                     info!("Successfully loaded asset");
                     Ok(data)
-                },
-                Err(err) => Err(Self::Error::new(ErrorKind::InvalidData, format!("Failed to deserialize Json File! Err {err}"))),
+                }
+                Err(err) => Err(Self::Error::new(
+                    ErrorKind::InvalidData,
+                    format!("Failed to deserialize Json File! Err {err}"),
+                )),
             }
         })
     }
@@ -224,27 +244,27 @@ impl AssetLoader for SchematicLoader {
 #[derive(Clone, Component)]
 pub struct Chunk {
     pub coords: Coords,
-    pub tiles: Vec<Vec<Tile>>
+    pub tiles: Vec<Vec<Tile>>,
 }
 
 // https://gist.github.com/jdah/ad997b858513a278426f8d91317115b9
 // https://gamedev.stackexchange.com/questions/188719/deterministic-procedural-wave-function-collapse
 struct WaveFunctionCollapse {
     world_seed: u64,
-    schematic: SchematicAsset
+    schematic: SchematicAsset,
 }
 
 impl WaveFunctionCollapse {
-
     fn collapse(&self, coords: &Coords, adjacent: &Adjacencies) -> Chunk {
-        let mut tiles = vec![vec![Tile::None; CHUNK_TILE_LENGTH as usize]; CHUNK_TILE_LENGTH as usize];
+        let mut tiles =
+            vec![vec![Tile::None; CHUNK_TILE_LENGTH as usize]; CHUNK_TILE_LENGTH as usize];
 
         // Generate bottom left
         tiles[0][0] = self.scratch(coords);
 
         return Chunk {
             coords: coords.clone(),
-            tiles
+            tiles,
         };
     }
 

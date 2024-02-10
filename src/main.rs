@@ -1,4 +1,8 @@
-use bevy::{app::{Startup, Update}, core_pipeline::core_2d::Camera2dBundle, prelude::*};
+use bevy::{
+    app::{Startup, Update},
+    core_pipeline::core_2d::Camera2dBundle,
+    prelude::*,
+};
 use components::{Dead, Health, Velocity};
 
 mod player;
@@ -22,13 +26,10 @@ fn main() {
         .add_systems(Startup, setup)
         .add_systems(Update, movement_system)
         .add_systems(Update, check_death)
-
         .run();
 }
 
-
 fn setup(mut commands: Commands, _: Res<AssetServer>) {
-
     info!("Setting up");
 
     info!("Creating camera");
@@ -37,17 +38,15 @@ fn setup(mut commands: Commands, _: Res<AssetServer>) {
     commands.spawn(cam);
 }
 
-fn movement_system(time: Res<Time>,mut query: Query<(&mut Transform, &Velocity)>,) {
-
-	for (mut transform, velocity) in query.iter_mut() {
-		let translation: &mut Vec3 = &mut transform.translation;
-		translation.x += velocity.dx * time.delta_seconds();
-		translation.y += velocity.dy * time.delta_seconds();
-	}
+fn movement_system(time: Res<Time>, mut query: Query<(&mut Transform, &Velocity)>) {
+    for (mut transform, velocity) in query.iter_mut() {
+        let translation: &mut Vec3 = &mut transform.translation;
+        translation.x += velocity.dx * time.delta_seconds();
+        translation.y += velocity.dy * time.delta_seconds();
+    }
 }
 
 fn check_death(mut commands: Commands, query: Query<(Entity, &Health), Without<Dead>>) {
-
     for (entity, health) in query.iter() {
         if health.current <= 0 {
             commands.entity(entity).insert(components::Dead);
