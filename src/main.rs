@@ -17,18 +17,19 @@ fn main() {
             }),
             ..default()
         }))
+        .add_plugins(world::WorldPlugin)
+        .add_plugins(player::PlayerPlugin)
         .add_systems(Startup, setup)
         .add_systems(Update, movement_system)
         .add_systems(Update, check_death)
-        .add_plugins(world::WorldPlugin)
-        .add_plugins(player::PlayerPlugin)
+
         .run();
 }
 
 
 fn setup(mut commands: Commands, _: Res<AssetServer>) {
 
-    info!("Setting Up...");
+    info!("Setting up");
 
     info!("Creating camera");
     let mut cam = Camera2dBundle::default();

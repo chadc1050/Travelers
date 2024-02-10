@@ -1,4 +1,4 @@
-use bevy::{app::{prelude::*, App, Plugin}, asset::{AssetServer, Assets}, ecs::{component::Component, system::{Commands, Query, Res, ResMut}}, input::{keyboard::KeyCode, Input}, log::info, math::{Vec2, Vec3}, prelude::default, render::color::Color, sprite::{Sprite, SpriteBundle, TextureAtlas}, transform::components::Transform};
+use bevy::{app::{prelude::*, App, Plugin}, asset::{AssetServer, Assets}, ecs::{component::Component, query::{self, With, Without}, system::{Commands, Query, Res, ResMut}}, input::{keyboard::KeyCode, Input}, log::{debug, info}, math::{Vec2, Vec3}, prelude::default, render::{camera::{self, Camera}, color::Color}, sprite::{Sprite, SpriteBundle, TextureAtlas}, transform::components::Transform};
 
 use crate::components::{Direction, Health, Velocity};
 
@@ -14,11 +14,12 @@ impl Plugin for PlayerPlugin {
 
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, player_spawn_system);
+        app.add_systems(Update, camera_follow);
         app.add_systems(Update, player_movement);
     }
 }
 
-pub fn player_spawn_system(mut commands: Commands, _: ResMut<AssetServer>, _: ResMut<Assets<TextureAtlas>>,) {
+fn player_spawn_system(mut commands: Commands, _: ResMut<AssetServer>, _: ResMut<Assets<TextureAtlas>>,) {
     
     let sprite = SpriteBundle {
         sprite: Sprite {
@@ -38,7 +39,7 @@ pub fn player_spawn_system(mut commands: Commands, _: ResMut<AssetServer>, _: Re
             dx: 0.,
             dy: 0.
         })
-        .insert(Transform::from_translation(Vec3::new(0., 0., 0.)))
+        .insert(Transform::from_translation(Vec3::new(0., 0., 1.)))
         .insert(Direction::Right)
         .insert(Health {
             current: 100,
@@ -46,27 +47,37 @@ pub fn player_spawn_system(mut commands: Commands, _: ResMut<AssetServer>, _: Re
         });
 }
 
-pub fn player_movement(kb: Res<Input<KeyCode>>, mut query: Query<(&mut Velocity, &Player)>) {
+fn camera_follow(
+    player_query: Query<(&Player, &Transform), Without<Camera>>, mut camera_query: Query<(&mut Transform, &Camera), Without<Player>>
+) {
+    if let Ok((mut cam_transform, _)) = camera_query.get_single_mut() {
+        if let Ok((_, player_transform)) = player_query.get_single() {
+            cam_transform.translation = player_transform.translation;
+        }
+    }
+}
+
+fn player_movement(kb: Res<Input<KeyCode>>, mut query: Query<(&mut Velocity, &Player)>) {
 
     if let Ok((mut velocity, player_state)) = query.get_single_mut() {
     
         velocity.dx = 0.0;
 		if kb.pressed(KeyCode::Left) || kb.pressed(KeyCode::A) {
-            info!("Player moved left!");
+            debug!("Player moved left!");
 			velocity.dx -= player_state.max_speed;
 		}
 		if kb.pressed(KeyCode::Right) || kb.pressed(KeyCode::D) {
-            info!("Player moved right!");
+            debug!("Player moved right!");
 			velocity.dx += player_state.max_speed;
 		}
 
 		velocity.dy = 0.0;
 		if kb.pressed(KeyCode::Up) || kb.pressed(KeyCode::W) {
-            info!("Player moved up!");
+            debug!("Player moved up!");
 			velocity.dy += player_state.max_speed;
 		}
 		if kb.pressed(KeyCode::Down) || kb.pressed(KeyCode::S) {
-            info!("Player moved down!");
+            debug!("Player moved down!");
 		    velocity.dy -= player_state.max_speed;
 		}
     }

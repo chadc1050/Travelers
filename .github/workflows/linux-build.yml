@@ -11,6 +11,9 @@ jobs:
    runs-on: "ubuntu-latest"
    steps:
      - uses: actions/checkout@v2
+     - name: Pull Linux Bevy Dependencies
+       run: |
+        sudo apt-get install g++ pkg-config libx11-dev libasound2-dev libudev-dev libxkbcommon-x11-0
      - name: Prepare Toolchain
        run: rustup show
      - name: Build

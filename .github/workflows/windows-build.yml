@@ -1,4 +1,4 @@
-name: Linux Run Build and Tests
+name: Windows Run Build and Tests
 
 on:
  push:
