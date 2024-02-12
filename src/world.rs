@@ -50,10 +50,7 @@ fn world_gen_system(
     asset_server: Res<AssetServer>,
     assets: Res<Assets<SchematicAsset>>,
 ) {
-    info!(
-        "Updating world [Current Chunks: {}]",
-        chunks.iter().collect::<Vec<_>>().len()
-    );
+    debug!("Updating world",);
 
     // Retrieve assets
     if let Some(schematic_handle) = asset_server.get_handle::<SchematicAsset>("schematic.json") {
@@ -274,12 +271,6 @@ impl WaveFunctionCollapse {
         let hash = hasher.finish();
 
         let mut rng = rand::rngs::StdRng::seed_from_u64(hash);
-        let rand: u8 = rng.gen_range(0..=255);
-
-        if rand == 0 {
-            Some((0, 1))
-        } else {
-            Some((TOTAL_TILES % rand, 1))
-        }
+        Some((rng.gen_range(0..TOTAL_TILES), 1))
     }
 }

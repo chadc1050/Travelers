@@ -11,6 +11,8 @@ mod components;
 
 mod world;
 
+mod debug;
+
 fn main() {
     info!("Starting Travelers...");
     App::new()
@@ -21,6 +23,7 @@ fn main() {
             }),
             ..default()
         }))
+        .add_plugins(debug::DebugPlugin)
         .add_plugins(world::WorldPlugin)
         .add_plugins(player::PlayerPlugin)
         .add_systems(Startup, setup)
