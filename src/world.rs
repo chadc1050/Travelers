@@ -1,5 +1,5 @@
 use std::{
-    collections::{hash_map::DefaultHasher, HashMap},
+    collections::{hash_map::DefaultHasher, HashMap, HashSet},
     hash::{Hash, Hasher},
     io::ErrorKind,
 };
@@ -7,7 +7,6 @@ use std::{
 use bevy::{
     asset::{io::Reader, AssetLoader, AsyncReadExt, LoadContext},
     prelude::*,
-    render::render_resource::Texture,
     utils::BoxedFuture,
 };
 use rand::{Rng, SeedableRng};
@@ -17,9 +16,7 @@ const CHUNK_TILE_LENGTH: i64 = 8;
 const TILE_SIZE: i64 = 32;
 const CHUNK_SIZE: i64 = CHUNK_TILE_LENGTH * TILE_SIZE;
 
-const TOTAL_TILES: u8 = 2;
-
-const RENDER_DISTANCE: i8 = 2;
+const RENDER_DISTANCE: i8 = 3;
 
 type Tile = Option<(u8, u8)>;
 type Coords = (i64, i64);
@@ -79,8 +76,8 @@ fn world_gen_system(
             for in_range in &chunks_in_range {
                 let mut present = false;
                 for (_, _, transform) in chunks.iter() {
-                    if transform.translation.x as i64 == in_range.0
-                        && transform.translation.y as i64 == in_range.1
+                    if in_range.0 == (transform.translation.x - (CHUNK_SIZE as f32 / 2.)) as i64
+                        && in_range.1 == (transform.translation.y - (CHUNK_SIZE as f32 / 2.)) as i64
                     {
                         present = true;
                         break;
@@ -91,7 +88,7 @@ fn world_gen_system(
                     info!(
                         "{}",
                         format!(
-                            "Found chunk needing to be generated ({},{})",
+                            "Found chunk needing to be generated: ({},{})",
                             in_range.0, in_range.1
                         )
                     );
@@ -100,10 +97,12 @@ fn world_gen_system(
                         .get(&schematic_handle)
                         .expect("Error loading in schematic!");
 
-                    let wfc = WaveFunctionCollapse {
-                        world_seed: 42,
-                        schematic: schematic.clone(),
-                    };
+                    let mut wfc = WaveFunctionCollapse::init(
+                        42,
+                        schematic.clone(),
+                        in_range.clone(),
+                        get_adjacent(in_range, &chunks),
+                    );
 
                     info!("Spawning chunk");
 
@@ -121,15 +120,15 @@ fn world_gen_system(
                     let chunk_bundle = (
                         Chunk {},
                         Transform::from_translation(Vec3::new(
-                            in_range.0 as f32,
-                            in_range.0 as f32,
+                            in_range.0 as f32 + (CHUNK_SIZE as f32 / 2.),
+                            in_range.1 as f32 + (CHUNK_SIZE as f32 / 2.),
                             0.,
                         )),
                         InheritedVisibility::default(),
                         GlobalTransform::default(),
                     );
 
-                    let tiles = wfc.collapse(in_range, &get_adjacent(in_range, &chunks));
+                    let tiles = wfc.collapse();
 
                     commands.spawn(chunk_bundle).with_children(|parent| {
                         for x in 0..CHUNK_TILE_LENGTH {
@@ -137,16 +136,18 @@ fn world_gen_system(
                                 if let Some(tile) = tiles[x as usize][y as usize] {
                                     let sprite_bundle = SpriteSheetBundle {
                                         texture_atlas: atlas_handle.clone(),
+                                        sprite: TextureAtlasSprite::new(tile.0 as usize),
                                         ..Default::default()
                                     };
 
-                                    parent.spawn(sprite_bundle).insert(
-                                        Transform::from_translation(Vec3::new(
-                                            (in_range.0 as f32) + (x as f32 * TILE_SIZE as f32),
-                                            (in_range.1 as f32) + (y as f32 * TILE_SIZE as f32),
+                                    parent
+                                        .spawn(sprite_bundle)
+                                        .insert(Transform::from_translation(Vec3::new(
+                                            (x as f32 * TILE_SIZE as f32) - (TILE_SIZE / 2) as f32,
+                                            (y as f32 * TILE_SIZE as f32) - (TILE_SIZE / 2) as f32,
                                             0.,
-                                        )),
-                                    );
+                                        )))
+                                        .insert(Visibility::Inherited);
                                 }
                             }
                         }
@@ -155,18 +156,22 @@ fn world_gen_system(
             }
 
             // Handle removing of chunks that are out of range
-            for (entity, chunk, transform) in chunks.iter() {
+            for (entity, _, transform) in chunks.iter() {
                 let mut is_stale = true;
                 for in_range in &chunks_in_range {
-                    if transform.translation.x as i64 == in_range.0
-                        && transform.translation.y as i64 == in_range.1
+                    if (transform.translation.x - (CHUNK_SIZE as f32 / 2.)) as i64 == in_range.0
+                        && (transform.translation.y - (CHUNK_SIZE as f32 / 2.)) as i64 == in_range.1
                     {
                         is_stale = false;
                         break;
                     }
                 }
                 if is_stale {
-                    info!("Removing chunk that is no longer in range.");
+                    info!(
+                        "Removing out of range chunk: ({},{})",
+                        (transform.translation.x - (CHUNK_SIZE as f32 / 2.)) as i64,
+                        (transform.translation.y - (CHUNK_SIZE as f32 / 2.)) as i64
+                    );
                     commands.entity(entity).despawn_recursive();
                 }
             }
@@ -235,8 +240,6 @@ pub struct SchematicAsset {
 pub struct TileSchematic {
     pub name: String,
     pub sheet: String,
-    pub x: u8,
-    pub y: u8,
     pub weight: u8,
     #[serde(rename = "0")]
     pub north: Vec<u8>,
@@ -293,27 +296,148 @@ pub struct Chunk;
 // https://gist.github.com/jdah/ad997b858513a278426f8d91317115b9
 // https://gamedev.stackexchange.com/questions/188719/deterministic-procedural-wave-function-collapse
 struct WaveFunctionCollapse {
-    world_seed: u64,
+    hash: u64,
+    adj: Adjacencies,
     schematic: SchematicAsset,
+    constatint_map: Vec<Vec<HashSet<u8>>>,
+    tiles: Vec<Vec<Option<(u8, u8)>>>,
 }
 
 impl WaveFunctionCollapse {
-    fn collapse(&self, coords: &Coords, adjacent: &Adjacencies) -> Vec<Vec<Option<(u8, u8)>>> {
-        let mut tiles =
-            vec![vec![Tile::None; CHUNK_TILE_LENGTH as usize]; CHUNK_TILE_LENGTH as usize];
-
-        // Generate bottom left
-        tiles[0][0] = self.scratch(coords);
-
-        tiles
+    pub fn init(
+        world_seed: u64,
+        schematic: SchematicAsset,
+        coords: Coords,
+        adj: Adjacencies,
+    ) -> WaveFunctionCollapse {
+        WaveFunctionCollapse {
+            hash: Self::get_hash(world_seed, &coords),
+            adj: adj,
+            schematic: schematic.clone(),
+            constatint_map: vec![
+                vec![
+                    (0..(schematic.tiles.len() as u8)).collect();
+                    CHUNK_TILE_LENGTH as usize
+                ];
+                CHUNK_TILE_LENGTH as usize
+            ],
+            tiles: vec![vec![None; CHUNK_TILE_LENGTH as usize]; CHUNK_TILE_LENGTH as usize],
+        }
     }
 
-    fn scratch(&self, coords: &Coords) -> Tile {
-        let mut hasher = DefaultHasher::new();
-        (coords.0 + coords.1).hash(&mut hasher);
-        let hash = hasher.finish();
+    pub fn collapse(&mut self) -> &Vec<Vec<Option<(u8, u8)>>> {
+        // Generate bottom left
+        self.tiles[0][0] = self.scratch();
 
-        let mut rng = rand::rngs::StdRng::seed_from_u64(hash);
-        Some((rng.gen_range(0..TOTAL_TILES), 1))
+        let mut has_next = true;
+
+        while has_next {
+            self.update_constraint_map();
+
+            if let Some(next) = self.find_lowest_entropy() {
+                self.tiles[next.0][next.1] = self.collapse_tile(next);
+            } else {
+                has_next = false;
+            }
+        }
+
+        &self.tiles
+    }
+
+    fn update_constraint_map(&mut self) {
+        info!("Updating constraint map");
+
+        for x in 0..CHUNK_TILE_LENGTH {
+            for y in 0..CHUNK_TILE_LENGTH {
+                if self.tiles[x as usize][y as usize].is_some() {
+                    self.constatint_map[x as usize][y as usize].clear();
+                    continue;
+                }
+
+                if x - 1 >= 0 {
+                    if let Some(left) = self.tiles[(x - 1) as usize][y as usize] {
+                        let allowed = self.schematic.tiles[&left.0.to_string()].east.clone();
+
+                        self.constatint_map[x as usize][y as usize]
+                            .retain(|&x| allowed.contains(&x));
+                    }
+                }
+
+                if y - 1 >= 0 {
+                    if let Some(down) = self.tiles[x as usize][(y - 1) as usize] {
+                        let allowed = self.schematic.tiles[&down.0.to_string()].north.clone();
+
+                        self.constatint_map[x as usize][y as usize]
+                            .retain(|&x| allowed.contains(&x));
+                    }
+                }
+
+                if x + 1 < CHUNK_TILE_LENGTH {
+                    if let Some(right) = self.tiles[(x + 1) as usize][y as usize] {
+                        let allowed = self.schematic.tiles[&right.0.to_string()].west.clone();
+
+                        self.constatint_map[x as usize][y as usize]
+                            .retain(|&x| allowed.contains(&x));
+                    }
+                }
+
+                if y + 1 < CHUNK_TILE_LENGTH {
+                    if let Some(up) = self.tiles[x as usize][(y + 1) as usize] {
+                        let allowed = self.schematic.tiles[&up.0.to_string()].south.clone();
+
+                        self.constatint_map[x as usize][y as usize]
+                            .retain(|&x| allowed.contains(&x));
+                    }
+                }
+            }
+        }
+    }
+
+    // Finds lowest non-zero entry in constraint map and returns it's index.
+    fn find_lowest_entropy(&self) -> Option<(usize, usize)> {
+        info!("Calculating entropy low");
+
+        let mut index = None;
+        let mut lowest = 0;
+
+        for x in 0..CHUNK_TILE_LENGTH {
+            for y in 0..CHUNK_TILE_LENGTH {
+                let n_constraints = self.constatint_map[x as usize][y as usize].len();
+                if n_constraints > 0 && (lowest == 0 || n_constraints < lowest) {
+                    lowest = n_constraints;
+                    index = Some((x as usize, y as usize))
+                }
+            }
+        }
+
+        if index.is_some() {
+            info!(
+                "Entropy minima: ({}, {})",
+                index.unwrap().0,
+                index.unwrap().1
+            );
+        }
+
+        index
+    }
+
+    // From scratch
+    fn scratch(&self) -> Tile {
+        let mut rng = rand::rngs::StdRng::seed_from_u64(self.hash);
+        Some((rng.gen_range(0..(self.schematic.tiles.len() as u8)), 1))
+    }
+
+    fn collapse_tile(&self, idx: (usize, usize)) -> Tile {
+        info!("Collapsing tile");
+        let mut rng = rand::rngs::StdRng::seed_from_u64(self.hash);
+        let available = self.constatint_map[idx.0][idx.1].clone();
+        let rand = rng.gen_range(0..available.len() as u8);
+        Some((available.iter().nth(rand.into()).unwrap().clone(), 1))
+    }
+
+    fn get_hash(world_seed: u64, coords: &Coords) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        (coords.0 + coords.1 + world_seed as i64).hash(&mut hasher);
+        hasher.finish()
     }
 }

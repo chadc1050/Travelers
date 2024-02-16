@@ -40,7 +40,7 @@ fn player_spawn_system(
     let sprite = SpriteBundle {
         sprite: Sprite {
             color: Color::rgb(0.25, 0.25, 0.75),
-            custom_size: Some(Vec2::new(50.0, 75.0)),
+            custom_size: Some(Vec2::new(20., 40.)),
             ..default()
         },
         ..default()

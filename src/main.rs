@@ -37,7 +37,7 @@ fn setup(mut commands: Commands, _: Res<AssetServer>) {
 
     info!("Creating camera");
     let mut cam = Camera2dBundle::default();
-    cam.projection.scale *= 1.0;
+    cam.projection.scale *= 0.5;
     commands.spawn(cam);
 }
 
