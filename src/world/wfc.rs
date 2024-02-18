@@ -47,6 +47,7 @@ impl WaveFunctionCollapse {
 
         let mut has_next = true;
 
+        // Collapse Chunk
         while has_next {
             self.update_constraint_map();
 
@@ -56,6 +57,8 @@ impl WaveFunctionCollapse {
                 has_next = false;
             }
         }
+
+        // TODO: Stitch adjacent chunks together
 
         &self.tiles
     }

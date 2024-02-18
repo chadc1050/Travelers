@@ -1,4 +1,7 @@
-use bevy::prelude::*;
+use bevy::{
+    prelude::*,
+    transform::{self, commands},
+};
 
 use crate::world::wfc::WaveFunctionCollapse;
 
@@ -15,7 +18,12 @@ const CHUNK_SIZE: i64 = CHUNK_TILE_LENGTH * TILE_SIZE;
 const RENDER_DISTANCE: i8 = 3;
 
 type Coords = (i64, i64);
-type Adjacencies = (Option<Chunk>, Option<Chunk>, Option<Chunk>, Option<Chunk>);
+type Adjacencies = (
+    Option<Vec<(Tile, Transform)>>,
+    Option<Vec<(Tile, Transform)>>,
+    Option<Vec<(Tile, Transform)>>,
+    Option<Vec<(Tile, Transform)>>,
+);
 
 #[derive(Resource)]
 pub struct ImageResource(Handle<Image>);
@@ -23,8 +31,13 @@ pub struct ImageResource(Handle<Image>);
 #[derive(Resource)]
 pub struct AtlasResource(Handle<TextureAtlas>);
 
-#[derive(Clone, Component)]
+#[derive(Clone, Component, Debug)]
 pub struct Chunk;
+
+#[derive(Clone, Component, Debug)]
+pub struct Tile {
+    texture_id: u8,
+}
 
 pub struct WorldPlugin;
 
@@ -52,7 +65,8 @@ fn load_schematic(asset_server: Res<AssetServer>, mut commands: Commands) {
 fn world_gen_system(
     mut commands: Commands,
     cam_pos: Query<&Transform, With<Camera>>,
-    chunks: Query<(Entity, &Chunk, &Transform)>,
+    chunks: Query<(Entity, &Chunk, &Transform, &Children)>,
+    tiles: Query<(Entity, &Tile, &Transform)>,
     asset_server: Res<AssetServer>,
     schematic: Res<Assets<SchematicAsset>>,
     mut atlas_asset: ResMut<Assets<TextureAtlas>>,
@@ -79,7 +93,7 @@ fn world_gen_system(
             // Handle creation of new chunks
             for in_range in &chunks_in_range {
                 let mut present = false;
-                for (_, _, transform) in chunks.iter() {
+                for (_, _, transform, _) in chunks.iter() {
                     if in_range.0 == (transform.translation.x - (CHUNK_SIZE as f32 / 2.)) as i64
                         && in_range.1 == (transform.translation.y - (CHUNK_SIZE as f32 / 2.)) as i64
                     {
@@ -101,13 +115,6 @@ fn world_gen_system(
                         .get(&schematic_handle)
                         .expect("Error loading in schematic!");
 
-                    let mut wfc = WaveFunctionCollapse::init(
-                        42,
-                        schematic.clone(),
-                        in_range.clone(),
-                        get_adjacent(in_range, &chunks),
-                    );
-
                     info!("Spawning chunk");
 
                     let atlas = TextureAtlas::from_grid(
@@ -121,6 +128,15 @@ fn world_gen_system(
 
                     let atlas_handle = atlas_asset.add(atlas);
 
+                    let mut wfc = WaveFunctionCollapse::init(
+                        42,
+                        schematic.clone(),
+                        in_range.clone(),
+                        get_adjacent(in_range, &chunks, &tiles),
+                    );
+
+                    let tiles = wfc.collapse();
+
                     let chunk_bundle = (
                         Chunk {},
                         Transform::from_translation(Vec3::new(
@@ -131,8 +147,6 @@ fn world_gen_system(
                         InheritedVisibility::default(),
                         GlobalTransform::default(),
                     );
-
-                    let tiles = wfc.collapse();
 
                     commands.spawn(chunk_bundle).with_children(|parent| {
                         for x in 0..CHUNK_TILE_LENGTH {
@@ -151,7 +165,8 @@ fn world_gen_system(
                                             (y as f32 * TILE_SIZE as f32) - (TILE_SIZE / 2) as f32,
                                             0.,
                                         )))
-                                        .insert(Visibility::Inherited);
+                                        .insert(Visibility::Inherited)
+                                        .insert(Tile { texture_id: tile.0 });
                                 }
                             }
                         }
@@ -160,7 +175,7 @@ fn world_gen_system(
             }
 
             // Handle removing of chunks that are out of range
-            for (entity, _, transform) in chunks.iter() {
+            for (entity, _, transform, _) in chunks.iter() {
                 let mut is_stale = true;
                 for in_range in &chunks_in_range {
                     if (transform.translation.x - (CHUNK_SIZE as f32 / 2.)) as i64 == in_range.0
@@ -183,27 +198,52 @@ fn world_gen_system(
     }
 }
 
-fn get_adjacent(coords: &Coords, chunks: &Query<(Entity, &Chunk, &Transform)>) -> Adjacencies {
+fn get_adjacent(
+    coords: &Coords,
+    chunks: &Query<(Entity, &Chunk, &Transform, &Children)>,
+    tiles: &Query<(Entity, &Tile, &Transform)>,
+) -> Adjacencies {
     let (mut north, mut east, mut south, mut west) =
         (Option::None, Option::None, Option::None, Option::None);
 
-    for (_, chunk, transform) in chunks.iter() {
+    // TODO: Need to fix timing of query, chunks may be generated during this step so adjacency check is only accurate as of beginning of step
+
+    for (entity, _, transform, children) in chunks.iter() {
         let to_check = (
-            transform.translation.x as i64,
-            transform.translation.y as i64,
+            (transform.translation.x - (CHUNK_SIZE as f32 / 2.)) as i64,
+            (transform.translation.y - (CHUNK_SIZE as f32 / 2.)) as i64,
         );
-        if coords.0 == to_check.0 && coords.1 + CHUNK_SIZE == to_check.1 {
-            north = Some(chunk.clone());
-        } else if coords.0 + CHUNK_SIZE == to_check.0 && coords.1 == to_check.1 {
-            east = Some(chunk.clone());
-        } else if coords.0 - CHUNK_SIZE == to_check.0 && coords.1 == to_check.1 {
-            south = Some(chunk.clone());
-        } else if coords.0 == to_check.0 && coords.1 - CHUNK_SIZE == to_check.1 {
-            west = Some(chunk.clone())
+
+        info!("Checking adjacenties for ({},{})", to_check.0, to_check.1);
+
+        if coords.0 == to_check.0 && coords.1 + CHUNK_SIZE + TILE_SIZE == to_check.1 {
+            north = Some(get_chunk_tiles((entity, children), tiles));
+        } else if coords.0 + CHUNK_SIZE + TILE_SIZE == to_check.0 && coords.1 == to_check.1 {
+            east = Some(get_chunk_tiles((entity, children), tiles));
+        } else if coords.0 - CHUNK_SIZE - TILE_SIZE == to_check.0 && coords.1 == to_check.1 {
+            south = Some(get_chunk_tiles((entity, children), tiles));
+        } else if coords.0 == to_check.0 && coords.1 - CHUNK_SIZE - TILE_SIZE == to_check.1 {
+            west = Some(get_chunk_tiles((entity, children), tiles));
         }
     }
 
     (north, east, south, west)
+}
+
+fn get_chunk_tiles(
+    chunk_children: (Entity, &Children),
+    tiles: &Query<(Entity, &Tile, &Transform)>,
+) -> Vec<(Tile, Transform)> {
+    let mut containing: Vec<(Tile, Transform)> = Vec::new();
+
+    for child in chunk_children.1.iter() {
+        info!("Found child");
+        if let Ok((_, tile, transform)) = tiles.get(*child) {
+            containing.push((tile.clone(), transform.clone()));
+        }
+    }
+
+    containing
 }
 
 // Get coords of chunks that are in the range of the camera, should account for chunk stitching
