@@ -206,18 +206,20 @@ fn get_adjacent(coords: &Coords, chunks: &Query<(Entity, &Chunk, &Transform)>) -
     (north, east, south, west)
 }
 
+// Get coords of chunks that are in the range of the camera, should account for chunk stitching
 fn get_chunks_in_range(pos: (f32, f32)) -> Vec<Coords> {
-    let offset_x = pos.0 as i64 / CHUNK_SIZE;
-
-    let offset_y = pos.1 as i64 / CHUNK_SIZE;
+    // Inverse linear equation to get offset with floor
+    let offset_x = ((pos.0 as f32 - TILE_SIZE as f32) / (CHUNK_SIZE + TILE_SIZE) as f32).floor();
+    let offset_y = ((pos.1 as f32 - TILE_SIZE as f32) / (CHUNK_SIZE + TILE_SIZE) as f32).floor();
 
     let mut coords = vec![Coords::default(); ((2 * RENDER_DISTANCE) ^ 2) as usize];
 
+    // Feed offset back into linear equation and extrapolate to the render distance
     for x in -RENDER_DISTANCE..=RENDER_DISTANCE {
         for y in -RENDER_DISTANCE..=RENDER_DISTANCE {
             coords.push((
-                (offset_x + x as i64) * CHUNK_SIZE,
-                (offset_y + y as i64) * CHUNK_SIZE,
+                ((offset_x as i64 + x as i64) * (CHUNK_SIZE + TILE_SIZE)) - TILE_SIZE,
+                ((offset_y as i64 + y as i64) * (CHUNK_SIZE + TILE_SIZE)) - TILE_SIZE,
             ));
         }
     }

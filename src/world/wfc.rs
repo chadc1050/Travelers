@@ -3,7 +3,7 @@ use std::{
     hash::{Hash, Hasher},
 };
 
-use bevy::log::info;
+use bevy::log::{debug, info};
 
 use super::{schematic::SchematicAsset, Adjacencies, Coords, CHUNK_TILE_LENGTH};
 
@@ -61,7 +61,7 @@ impl WaveFunctionCollapse {
     }
 
     fn update_constraint_map(&mut self) {
-        info!("Updating constraint map");
+        debug!("Updating constraint map");
 
         for x in 0..CHUNK_TILE_LENGTH {
             for y in 0..CHUNK_TILE_LENGTH {
@@ -111,7 +111,7 @@ impl WaveFunctionCollapse {
 
     // Finds lowest non-zero entry in constraint map and returns it's index.
     fn find_lowest_entropy(&self) -> Option<(usize, usize)> {
-        info!("Calculating entropy low");
+        debug!("Calculating entropy low");
 
         let mut index = None;
         let mut lowest = 0;
@@ -127,7 +127,7 @@ impl WaveFunctionCollapse {
         }
 
         if index.is_some() {
-            info!(
+            debug!(
                 "Entropy minima: ({}, {})",
                 index.unwrap().0,
                 index.unwrap().1
@@ -144,7 +144,7 @@ impl WaveFunctionCollapse {
     }
 
     fn collapse_tile(&self, idx: (usize, usize)) -> Option<(u8, u8)> {
-        info!("Collapsing tile");
+        debug!("Collapsing tile");
         let mut rng = rand::rngs::StdRng::seed_from_u64(self.hash);
         let available = self.constatint_map[idx.0][idx.1].clone();
         let rand = rng.gen_range(0..available.len() as u8);
