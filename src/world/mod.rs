@@ -14,7 +14,6 @@ const CHUNK_SIZE: i64 = CHUNK_TILE_LENGTH * TILE_SIZE;
 
 const RENDER_DISTANCE: i8 = 3;
 
-type Tile = Option<(u8, u8)>;
 type Coords = (i64, i64);
 type Adjacencies = (Option<Chunk>, Option<Chunk>, Option<Chunk>, Option<Chunk>);
 

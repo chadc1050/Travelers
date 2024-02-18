@@ -5,7 +5,7 @@ use std::{
 
 use bevy::log::info;
 
-use super::{schematic::SchematicAsset, Adjacencies, Coords, Tile, CHUNK_TILE_LENGTH};
+use super::{schematic::SchematicAsset, Adjacencies, Coords, CHUNK_TILE_LENGTH};
 
 use rand::{Rng, SeedableRng};
 
@@ -138,12 +138,12 @@ impl WaveFunctionCollapse {
     }
 
     // From scratch
-    fn scratch(&self) -> Tile {
+    fn scratch(&self) -> Option<(u8, u8)> {
         let mut rng = rand::rngs::StdRng::seed_from_u64(self.hash);
         Some((rng.gen_range(0..(self.schematic.tiles.len() as u8)), 1))
     }
 
-    fn collapse_tile(&self, idx: (usize, usize)) -> Tile {
+    fn collapse_tile(&self, idx: (usize, usize)) -> Option<(u8, u8)> {
         info!("Collapsing tile");
         let mut rng = rand::rngs::StdRng::seed_from_u64(self.hash);
         let available = self.constatint_map[idx.0][idx.1].clone();
