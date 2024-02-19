@@ -8,6 +8,7 @@ use bevy::{
 
 use serde::Deserialize;
 
+// TODO: Have the hashmap deserialize to a u8 key instead of a string.
 #[derive(Asset, Clone, Debug, TypePath, Deserialize)]
 pub struct SchematicAsset {
     #[serde(flatten)]

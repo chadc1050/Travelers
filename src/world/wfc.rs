@@ -18,7 +18,7 @@ pub struct WaveFunctionCollapse {
     coords: Coords,
     adj: Adjacencies,
     schematic: SchematicAsset,
-    constatint_map: Vec<Vec<HashSet<u8>>>,
+    constraint_map: Vec<Vec<HashSet<u8>>>,
     tiles: Vec<Vec<Option<(u8, u8)>>>,
 }
 
@@ -34,9 +34,9 @@ impl WaveFunctionCollapse {
             coords: coords,
             adj: adj,
             schematic: schematic.clone(),
-            constatint_map: vec![
+            constraint_map: vec![
                 vec![
-                    (0..(schematic.tiles.len() as u8)).collect();
+                    Self::init_constraints(schematic);
                     (CHUNK_TILE_LENGTH + 2) as usize
                 ];
                 (CHUNK_TILE_LENGTH + 2) as usize
@@ -56,31 +56,37 @@ impl WaveFunctionCollapse {
 
         // Collapse Chunk
         while has_next {
-            self.update_constraint_map();
-
             if let Some(next) = self.find_chunk_lowest_entropy() {
                 self.tiles[next.0][next.1] = self.collapse_chunk_tile(next);
             } else {
                 has_next = false;
             }
+
+            self.update_constraint_map();
         }
 
         has_next = true;
 
         // Collapse stitching
         while has_next {
-            self.update_constraint_map();
-
             if let Some(next) = self.find_stitched_lowest_entropy() {
                 self.tiles[next.0][next.1] = self.collapse_stitched_tile(next);
             } else {
                 has_next = false;
             }
+
+            self.update_constraint_map();
         }
 
-        info!("{:?}", self.tiles);
-
         &self.tiles
+    }
+
+    fn init_constraints(schematic: SchematicAsset) -> HashSet<u8> {
+        schematic
+            .tiles
+            .keys()
+            .map(|key| key.parse::<u8>().unwrap())
+            .collect()
     }
 
     fn update_constraint_map(&mut self) {
@@ -89,7 +95,7 @@ impl WaveFunctionCollapse {
         for x in 0..(CHUNK_TILE_LENGTH + 2) {
             for y in 0..(CHUNK_TILE_LENGTH + 2) {
                 if self.tiles[x as usize][y as usize].is_some() {
-                    self.constatint_map[x as usize][y as usize].clear();
+                    self.constraint_map[x as usize][y as usize].clear();
                     continue;
                 }
 
@@ -97,8 +103,8 @@ impl WaveFunctionCollapse {
                     if let Some(left) = self.tiles[(x - 1) as usize][y as usize] {
                         let allowed = self.schematic.tiles[&left.0.to_string()].east.clone();
 
-                        self.constatint_map[x as usize][y as usize]
-                            .retain(|&x| allowed.contains(&x));
+                        self.constraint_map[x as usize][y as usize]
+                            .retain(|&to_retain| allowed.contains(&to_retain));
                     }
                 } else if let Some(west) = &self.adj.3 {
                     for (tile, transform) in west.iter() {
@@ -114,13 +120,13 @@ impl WaveFunctionCollapse {
                                 .east
                                 .clone();
 
-                            self.constatint_map[x as usize][y as usize]
-                                .retain(|&x| allowed.contains(&x));
+                            self.constraint_map[x as usize][y as usize]
+                                .retain(|&to_retain| allowed.contains(&to_retain));
                         }
                     }
                 } else {
                     // No chunk to stitch yet
-                    self.constatint_map[x as usize][y as usize].clear();
+                    self.constraint_map[x as usize][y as usize].clear();
                     continue;
                 }
 
@@ -128,8 +134,8 @@ impl WaveFunctionCollapse {
                     if let Some(down) = self.tiles[x as usize][(y - 1) as usize] {
                         let allowed = self.schematic.tiles[&down.0.to_string()].north.clone();
 
-                        self.constatint_map[x as usize][y as usize]
-                            .retain(|&x| allowed.contains(&x));
+                        self.constraint_map[x as usize][y as usize]
+                            .retain(|&to_retain| allowed.contains(&to_retain));
                     }
                 } else if let Some(south) = &self.adj.2 {
                     for (tile, transform) in south.iter() {
@@ -146,22 +152,23 @@ impl WaveFunctionCollapse {
                                 .north
                                 .clone();
 
-                            self.constatint_map[x as usize][y as usize]
-                                .retain(|&x| allowed.contains(&x));
+                            self.constraint_map[x as usize][y as usize]
+                                .retain(|&to_retain| allowed.contains(&to_retain));
                         }
                     }
                 } else {
                     // No chunk to stitch yet
-                    self.constatint_map[x as usize][y as usize].clear();
+                    self.constraint_map[x as usize][y as usize].clear();
                     continue;
                 }
 
                 if x + 1 < CHUNK_TILE_LENGTH {
                     if let Some(right) = self.tiles[(x + 1) as usize][y as usize] {
+                        info!("{} {:?}", right.0, self.constraint_map);
                         let allowed = self.schematic.tiles[&right.0.to_string()].west.clone();
 
-                        self.constatint_map[x as usize][y as usize]
-                            .retain(|&x| allowed.contains(&x));
+                        self.constraint_map[x as usize][y as usize]
+                            .retain(|&to_retain| allowed.contains(&to_retain));
                     }
                 } else if let Some(east) = &self.adj.1 {
                     for (tile, transform) in east.iter() {
@@ -177,13 +184,13 @@ impl WaveFunctionCollapse {
                                 .west
                                 .clone();
 
-                            self.constatint_map[x as usize][y as usize]
-                                .retain(|&x| allowed.contains(&x));
+                            self.constraint_map[x as usize][y as usize]
+                                .retain(|&to_retain| allowed.contains(&to_retain));
                         }
                     }
                 } else {
                     // No chunk to stitch yet
-                    self.constatint_map[x as usize][y as usize].clear();
+                    self.constraint_map[x as usize][y as usize].clear();
                     continue;
                 }
 
@@ -191,8 +198,8 @@ impl WaveFunctionCollapse {
                     if let Some(up) = self.tiles[x as usize][(y + 1) as usize] {
                         let allowed = self.schematic.tiles[&up.0.to_string()].south.clone();
 
-                        self.constatint_map[x as usize][y as usize]
-                            .retain(|&x| allowed.contains(&x));
+                        self.constraint_map[x as usize][y as usize]
+                            .retain(|&to_retain| allowed.contains(&to_retain));
                     }
                 } else if let Some(north) = &self.adj.0 {
                     for (tile, transform) in north.iter() {
@@ -209,13 +216,13 @@ impl WaveFunctionCollapse {
                                 .south
                                 .clone();
 
-                            self.constatint_map[x as usize][y as usize]
-                                .retain(|&x| allowed.contains(&x));
+                            self.constraint_map[x as usize][y as usize]
+                                .retain(|&to_retain| allowed.contains(&to_retain));
                         }
                     }
                 } else {
                     // No chunk to stitch yet
-                    self.constatint_map[x as usize][y as usize].clear();
+                    self.constraint_map[x as usize][y as usize].clear();
                     continue;
                 }
             }
@@ -231,7 +238,7 @@ impl WaveFunctionCollapse {
 
         for x in 1..=CHUNK_TILE_LENGTH {
             for y in 1..=CHUNK_TILE_LENGTH {
-                let n_constraints = self.constatint_map[x as usize][y as usize].len();
+                let n_constraints = self.constraint_map[x as usize][y as usize].len();
                 if n_constraints > 0 && (lowest == 0 || n_constraints < lowest) {
                     lowest = n_constraints;
                     index = Some((x as usize, y as usize))
@@ -256,11 +263,11 @@ impl WaveFunctionCollapse {
         let mut index = None;
         let mut lowest = 0;
 
-        for x in 0..=(CHUNK_TILE_LENGTH + 1) {
-            for y in 0..=(CHUNK_TILE_LENGTH + 1) {
+        for x in 0..(CHUNK_TILE_LENGTH + 2) {
+            for y in 0..(CHUNK_TILE_LENGTH + 2) {
                 // Only the perimeter
                 if x == 0 || x == CHUNK_TILE_LENGTH + 1 || y == 0 || y == CHUNK_TILE_LENGTH + 1 {
-                    let n_constraints = self.constatint_map[x as usize][y as usize].len();
+                    let n_constraints = self.constraint_map[x as usize][y as usize].len();
                     if n_constraints > 0 && (lowest == 0 || n_constraints < lowest) {
                         lowest = n_constraints;
                         index = Some((x as usize, y as usize))
@@ -283,13 +290,22 @@ impl WaveFunctionCollapse {
     // From scratch
     fn scratch(&self) -> Option<(u8, u8)> {
         let mut rng = rand::rngs::StdRng::seed_from_u64(self.hash);
-        Some((rng.gen_range(0..(self.schematic.tiles.len() as u8)), 1))
+
+        let keys: Vec<u8> = self
+            .schematic
+            .tiles
+            .keys()
+            .map(|key| key.parse::<u8>().unwrap())
+            .collect();
+
+        let idx = rng.gen_range(0..(keys.len() as u8));
+        Some((keys[idx as usize], 1))
     }
 
     fn collapse_chunk_tile(&self, idx: (usize, usize)) -> Option<(u8, u8)> {
         info!("Collapsing tile");
         let mut rng = rand::rngs::StdRng::seed_from_u64(self.hash);
-        let available = self.constatint_map[idx.0][idx.1].clone();
+        let available = self.constraint_map[idx.0][idx.1].clone();
         let rand = rng.gen_range(0..available.len() as u8);
         Some((available.iter().nth(rand.into()).unwrap().clone(), 1))
     }
@@ -297,7 +313,7 @@ impl WaveFunctionCollapse {
     fn collapse_stitched_tile(&self, idx: (usize, usize)) -> Option<(u8, u8)> {
         info!("Collapsing stitched tile");
         let mut rng = rand::thread_rng();
-        let available = self.constatint_map[idx.0][idx.1].clone();
+        let available = self.constraint_map[idx.0][idx.1].clone();
         let rand = rng.gen_range(0..available.len() as u8);
         Some((available.iter().nth(rand.into()).unwrap().clone(), 1))
     }

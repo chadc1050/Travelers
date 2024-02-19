@@ -1,5 +1,3 @@
-use std::env;
-
 use bevy::{
     app::{Startup, Update},
     core_pipeline::core_2d::Camera2dBundle,

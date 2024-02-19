@@ -1,7 +1,4 @@
-use bevy::{
-    prelude::*,
-    transform::{self, commands},
-};
+use bevy::prelude::*;
 
 use crate::world::wfc::WaveFunctionCollapse;
 
@@ -69,7 +66,7 @@ fn world_gen_system(
     tiles: Query<(Entity, &Tile, &Transform)>,
     asset_server: Res<AssetServer>,
     schematic: Res<Assets<SchematicAsset>>,
-    mut atlas_asset: ResMut<Assets<TextureAtlas>>,
+    atlas_asset: ResMut<Assets<TextureAtlas>>,
 ) {
     debug!("Updating world");
 
@@ -91,112 +88,140 @@ fn world_gen_system(
             let chunks_in_range = get_chunks_in_range(player_coords);
 
             // Handle creation of new chunks
-            for in_range in &chunks_in_range {
-                let mut present = false;
-                for (_, _, transform, _) in chunks.iter() {
-                    if in_range.0 == (transform.translation.x - (CHUNK_SIZE as f32 / 2.)) as i64
-                        && in_range.1 == (transform.translation.y - (CHUNK_SIZE as f32 / 2.)) as i64
-                    {
-                        present = true;
-                        break;
-                    }
-                }
-
-                if !present {
-                    info!(
-                        "{}",
-                        format!(
-                            "Found chunk needing to be generated: ({},{})",
-                            in_range.0, in_range.1
-                        )
-                    );
-
-                    let schematic = schematic
-                        .get(&schematic_handle)
-                        .expect("Error loading in schematic!");
-
-                    info!("Spawning chunk");
-
-                    let atlas = TextureAtlas::from_grid(
-                        image_handle.clone(),
-                        Vec2::new(TILE_SIZE as f32, TILE_SIZE as f32),
-                        10,
-                        16,
-                        None,
-                        None,
-                    );
-
-                    let atlas_handle = atlas_asset.add(atlas);
-
-                    let mut wfc = WaveFunctionCollapse::init(
-                        42,
-                        schematic.clone(),
-                        in_range.clone(),
-                        get_adjacent(in_range, &chunks, &tiles),
-                    );
-
-                    // Tiles is CHUNK_TILE_LENGTH + 2 x CHUNK_TILE_LENGTH + 2
-                    let tiles = wfc.collapse();
-
-                    let chunk_bundle = (
-                        Chunk {},
-                        Transform::from_translation(Vec3::new(
-                            in_range.0 as f32 + (CHUNK_SIZE as f32 / 2.),
-                            in_range.1 as f32 + (CHUNK_SIZE as f32 / 2.),
-                            0.,
-                        )),
-                        InheritedVisibility::default(),
-                        GlobalTransform::default(),
-                    );
-
-                    commands.spawn(chunk_bundle).with_children(|parent| {
-                        for x in 0..(CHUNK_TILE_LENGTH + 2) {
-                            for y in 0..(CHUNK_TILE_LENGTH + 2) {
-                                if let Some(tile) = tiles[x as usize][y as usize] {
-                                    let sprite_bundle = SpriteSheetBundle {
-                                        texture_atlas: atlas_handle.clone(),
-                                        sprite: TextureAtlasSprite::new(tile.0 as usize),
-                                        ..Default::default()
-                                    };
-
-                                    parent
-                                        .spawn(sprite_bundle)
-                                        .insert(Transform::from_translation(Vec3::new(
-                                            (x as f32 * TILE_SIZE as f32)
-                                                - ((3 * TILE_SIZE) / 2) as f32,
-                                            (y as f32 * TILE_SIZE as f32)
-                                                - ((3 * TILE_SIZE) / 2) as f32,
-                                            0.,
-                                        )))
-                                        .insert(Visibility::Inherited)
-                                        .insert(Tile { texture_id: tile.0 });
-                                }
-                            }
-                        }
-                    });
-                }
-            }
+            create_chunks(
+                &chunks_in_range,
+                &chunks,
+                &tiles,
+                schematic,
+                schematic_handle,
+                image_handle,
+                atlas_asset,
+                &mut commands,
+            );
 
             // Handle removing of chunks that are out of range
-            for (entity, _, transform, _) in chunks.iter() {
-                let mut is_stale = true;
-                for in_range in &chunks_in_range {
-                    if (transform.translation.x - (CHUNK_SIZE as f32 / 2.)) as i64 == in_range.0
-                        && (transform.translation.y - (CHUNK_SIZE as f32 / 2.)) as i64 == in_range.1
-                    {
-                        is_stale = false;
-                        break;
+            remove_stale_chunks(&chunks_in_range, &chunks, &mut commands)
+        }
+    }
+}
+
+fn create_chunks(
+    chunks_in_range: &Vec<Coords>,
+    chunks: &Query<(Entity, &Chunk, &Transform, &Children)>,
+    tiles: &Query<(Entity, &Tile, &Transform)>,
+    schematic: Res<Assets<SchematicAsset>>,
+    schematic_handle: Handle<SchematicAsset>,
+    image_handle: Handle<Image>,
+    mut atlas_asset: ResMut<Assets<TextureAtlas>>,
+    commands: &mut Commands,
+) {
+    for in_range in chunks_in_range {
+        let mut present = false;
+        for (_, _, transform, _) in chunks.iter() {
+            if in_range.0 == (transform.translation.x - (CHUNK_SIZE as f32 / 2.)) as i64
+                && in_range.1 == (transform.translation.y - (CHUNK_SIZE as f32 / 2.)) as i64
+            {
+                present = true;
+                break;
+            }
+        }
+
+        if !present {
+            info!(
+                "{}",
+                format!(
+                    "Found chunk needing to be generated: ({},{})",
+                    in_range.0, in_range.1
+                )
+            );
+
+            let schematic = schematic
+                .get(&schematic_handle)
+                .expect("Error loading in schematic!");
+
+            info!("Spawning chunk");
+
+            let atlas = TextureAtlas::from_grid(
+                image_handle.clone(),
+                Vec2::new(TILE_SIZE as f32, TILE_SIZE as f32),
+                10,
+                16,
+                None,
+                None,
+            );
+
+            let atlas_handle = atlas_asset.add(atlas);
+
+            let mut wfc = WaveFunctionCollapse::init(
+                42,
+                schematic.clone(),
+                in_range.clone(),
+                get_adjacent(in_range, &chunks, &tiles),
+            );
+
+            // Tiles is CHUNK_TILE_LENGTH + 2 x CHUNK_TILE_LENGTH + 2
+            let tiles = wfc.collapse();
+
+            let chunk_bundle = (
+                Chunk {},
+                Transform::from_translation(Vec3::new(
+                    in_range.0 as f32 + (CHUNK_SIZE as f32 / 2.),
+                    in_range.1 as f32 + (CHUNK_SIZE as f32 / 2.),
+                    0.,
+                )),
+                InheritedVisibility::default(),
+                GlobalTransform::default(),
+            );
+
+            commands.spawn(chunk_bundle).with_children(|parent| {
+                for x in 0..(CHUNK_TILE_LENGTH + 2) {
+                    for y in 0..(CHUNK_TILE_LENGTH + 2) {
+                        if let Some(tile) = tiles[x as usize][y as usize] {
+                            let sprite_bundle = SpriteSheetBundle {
+                                texture_atlas: atlas_handle.clone(),
+                                sprite: TextureAtlasSprite::new(tile.0 as usize),
+                                ..Default::default()
+                            };
+
+                            parent
+                                .spawn(sprite_bundle)
+                                .insert(Transform::from_translation(Vec3::new(
+                                    ((x - 1) as f32 * TILE_SIZE as f32) - ((TILE_SIZE) / 2) as f32,
+                                    ((y - 1) as f32 * TILE_SIZE as f32) - (TILE_SIZE / 2) as f32,
+                                    0.,
+                                )))
+                                .insert(Visibility::Inherited)
+                                .insert(Tile { texture_id: tile.0 });
+                        }
                     }
                 }
-                if is_stale {
-                    info!(
-                        "Removing out of range chunk: ({},{})",
-                        (transform.translation.x - (CHUNK_SIZE as f32 / 2.)) as i64,
-                        (transform.translation.y - (CHUNK_SIZE as f32 / 2.)) as i64
-                    );
-                    commands.entity(entity).despawn_recursive();
-                }
+            });
+        }
+    }
+}
+
+fn remove_stale_chunks(
+    chunks_in_range: &Vec<Coords>,
+    chunks: &Query<(Entity, &Chunk, &Transform, &Children)>,
+    commands: &mut Commands,
+) {
+    for (entity, _, transform, _) in chunks.iter() {
+        let mut is_stale = true;
+        for in_range in chunks_in_range {
+            if (transform.translation.x - (CHUNK_SIZE as f32 / 2.)) as i64 == in_range.0
+                && (transform.translation.y - (CHUNK_SIZE as f32 / 2.)) as i64 == in_range.1
+            {
+                is_stale = false;
+                break;
             }
+        }
+        if is_stale {
+            info!(
+                "Removing out of range chunk: ({},{})",
+                (transform.translation.x - (CHUNK_SIZE as f32 / 2.)) as i64,
+                (transform.translation.y - (CHUNK_SIZE as f32 / 2.)) as i64
+            );
+            commands.entity(entity).despawn_recursive();
         }
     }
 }
