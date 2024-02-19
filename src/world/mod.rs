@@ -135,6 +135,7 @@ fn world_gen_system(
                         get_adjacent(in_range, &chunks, &tiles),
                     );
 
+                    // Tiles is CHUNK_TILE_LENGTH + 2 x CHUNK_TILE_LENGTH + 2
                     let tiles = wfc.collapse();
 
                     let chunk_bundle = (
@@ -149,8 +150,8 @@ fn world_gen_system(
                     );
 
                     commands.spawn(chunk_bundle).with_children(|parent| {
-                        for x in 0..CHUNK_TILE_LENGTH {
-                            for y in 0..CHUNK_TILE_LENGTH {
+                        for x in 0..(CHUNK_TILE_LENGTH + 2) {
+                            for y in 0..(CHUNK_TILE_LENGTH + 2) {
                                 if let Some(tile) = tiles[x as usize][y as usize] {
                                     let sprite_bundle = SpriteSheetBundle {
                                         texture_atlas: atlas_handle.clone(),
@@ -161,8 +162,10 @@ fn world_gen_system(
                                     parent
                                         .spawn(sprite_bundle)
                                         .insert(Transform::from_translation(Vec3::new(
-                                            (x as f32 * TILE_SIZE as f32) - (TILE_SIZE / 2) as f32,
-                                            (y as f32 * TILE_SIZE as f32) - (TILE_SIZE / 2) as f32,
+                                            (x as f32 * TILE_SIZE as f32)
+                                                - ((3 * TILE_SIZE) / 2) as f32,
+                                            (y as f32 * TILE_SIZE as f32)
+                                                - ((3 * TILE_SIZE) / 2) as f32,
                                             0.,
                                         )))
                                         .insert(Visibility::Inherited)
