@@ -3,11 +3,14 @@ use std::{
     hash::{Hash, Hasher},
 };
 
-use bevy::log::{debug, info};
+use bevy::{
+    log::{debug, info},
+    transform::components::Transform,
+};
 
 use crate::world::TILE_SIZE;
 
-use super::{schematic::SchematicAsset, Adjacencies, Coords, CHUNK_TILE_LENGTH};
+use super::{schematic::SchematicAsset, Adjacencies, Coords, Tile, CHUNK_TILE_LENGTH};
 
 use rand::{Rng, SeedableRng};
 
@@ -16,7 +19,6 @@ use rand::{Rng, SeedableRng};
 pub struct WaveFunctionCollapse {
     hash: u64,
     coords: Coords,
-    adj: Adjacencies,
     schematic: SchematicAsset,
     constraint_map: Vec<Vec<HashSet<u8>>>,
     tiles: Vec<Vec<Option<(u8, u8)>>>,
@@ -25,52 +27,34 @@ pub struct WaveFunctionCollapse {
 impl WaveFunctionCollapse {
     pub fn init(
         world_seed: u64,
-        schematic: SchematicAsset,
+        schematic: &SchematicAsset,
         coords: Coords,
-        adj: Adjacencies,
     ) -> WaveFunctionCollapse {
         WaveFunctionCollapse {
-            hash: Self::get_hash(world_seed, &coords),
+            hash: get_hash(world_seed, &coords),
             coords: coords,
-            adj: adj,
             schematic: schematic.clone(),
             constraint_map: vec![
                 vec![
-                    Self::init_constraints(schematic);
-                    (CHUNK_TILE_LENGTH + 2) as usize
+                    init_constraints(schematic.clone());
+                    CHUNK_TILE_LENGTH as usize
                 ];
-                (CHUNK_TILE_LENGTH + 2) as usize
+                CHUNK_TILE_LENGTH as usize
             ],
-            tiles: vec![
-                vec![None; (CHUNK_TILE_LENGTH + 2) as usize];
-                (CHUNK_TILE_LENGTH + 2) as usize
-            ],
+            tiles: vec![vec![None; CHUNK_TILE_LENGTH as usize]; CHUNK_TILE_LENGTH as usize],
         }
     }
 
     pub fn collapse(&mut self) -> &Vec<Vec<Option<(u8, u8)>>> {
         // Generate bottom left of chunk
-        self.tiles[1][1] = self.scratch();
+        self.tiles[0][0] = self.scratch();
 
         let mut has_next = true;
 
         // Collapse Chunk
         while has_next {
-            if let Some(next) = self.find_chunk_lowest_entropy() {
-                self.tiles[next.0][next.1] = self.collapse_chunk_tile(next);
-            } else {
-                has_next = false;
-            }
-
-            self.update_constraint_map();
-        }
-
-        has_next = true;
-
-        // Collapse stitching
-        while has_next {
-            if let Some(next) = self.find_stitched_lowest_entropy() {
-                self.tiles[next.0][next.1] = self.collapse_stitched_tile(next);
+            if let Some(next) = self.lowest_entropy() {
+                self.tiles[next.0][next.1] = self.collapse_tile(next);
             } else {
                 has_next = false;
             }
@@ -81,19 +65,11 @@ impl WaveFunctionCollapse {
         &self.tiles
     }
 
-    fn init_constraints(schematic: SchematicAsset) -> HashSet<u8> {
-        schematic
-            .tiles
-            .keys()
-            .map(|key| key.parse::<u8>().unwrap())
-            .collect()
-    }
-
     fn update_constraint_map(&mut self) {
         info!("Updating constraint map");
 
-        for x in 0..(CHUNK_TILE_LENGTH + 2) {
-            for y in 0..(CHUNK_TILE_LENGTH + 2) {
+        for x in 0..CHUNK_TILE_LENGTH {
+            for y in 0..CHUNK_TILE_LENGTH {
                 if self.tiles[x as usize][y as usize].is_some() {
                     self.constraint_map[x as usize][y as usize].clear();
                     continue;
@@ -106,28 +82,6 @@ impl WaveFunctionCollapse {
                         self.constraint_map[x as usize][y as usize]
                             .retain(|&to_retain| allowed.contains(&to_retain));
                     }
-                } else if let Some(west) = &self.adj.3 {
-                    for (tile, transform) in west.iter() {
-                        // Convert tile to world coords
-                        let x_world = self.coords.0 + (x * TILE_SIZE) - TILE_SIZE;
-                        let y_world = self.coords.1 + (y * TILE_SIZE) - TILE_SIZE;
-
-                        if (transform.translation.x - (TILE_SIZE as f32 / 2.)) as i64 + TILE_SIZE
-                            == x_world
-                            && (transform.translation.y - (TILE_SIZE as f32 / 2.)) as i64 == y_world
-                        {
-                            let allowed = self.schematic.tiles[&tile.texture_id.to_string()]
-                                .east
-                                .clone();
-
-                            self.constraint_map[x as usize][y as usize]
-                                .retain(|&to_retain| allowed.contains(&to_retain));
-                        }
-                    }
-                } else {
-                    // No chunk to stitch yet
-                    self.constraint_map[x as usize][y as usize].clear();
-                    continue;
                 }
 
                 if y - 1 >= 0 {
@@ -137,61 +91,15 @@ impl WaveFunctionCollapse {
                         self.constraint_map[x as usize][y as usize]
                             .retain(|&to_retain| allowed.contains(&to_retain));
                     }
-                } else if let Some(south) = &self.adj.2 {
-                    for (tile, transform) in south.iter() {
-                        // Convert tile to world coords
-                        let x_world = self.coords.0 + (x * TILE_SIZE) - TILE_SIZE;
-                        let y_world = self.coords.1 + (y * TILE_SIZE) - TILE_SIZE;
-
-                        if (transform.translation.x - (TILE_SIZE as f32 / 2.)) as i64 == x_world
-                            && (transform.translation.y - (TILE_SIZE as f32 / 2.)) as i64
-                                + TILE_SIZE
-                                == y_world
-                        {
-                            let allowed = self.schematic.tiles[&tile.texture_id.to_string()]
-                                .north
-                                .clone();
-
-                            self.constraint_map[x as usize][y as usize]
-                                .retain(|&to_retain| allowed.contains(&to_retain));
-                        }
-                    }
-                } else {
-                    // No chunk to stitch yet
-                    self.constraint_map[x as usize][y as usize].clear();
-                    continue;
                 }
 
                 if x + 1 < CHUNK_TILE_LENGTH {
                     if let Some(right) = self.tiles[(x + 1) as usize][y as usize] {
-                        info!("{} {:?}", right.0, self.constraint_map);
                         let allowed = self.schematic.tiles[&right.0.to_string()].west.clone();
 
                         self.constraint_map[x as usize][y as usize]
                             .retain(|&to_retain| allowed.contains(&to_retain));
                     }
-                } else if let Some(east) = &self.adj.1 {
-                    for (tile, transform) in east.iter() {
-                        // Convert tile to world coords
-                        let x_world = self.coords.0 + (x * TILE_SIZE) - TILE_SIZE;
-                        let y_world = self.coords.1 + (y * TILE_SIZE) - TILE_SIZE;
-
-                        if (transform.translation.x - (TILE_SIZE as f32 / 2.)) as i64 - TILE_SIZE
-                            == x_world
-                            && (transform.translation.y - (TILE_SIZE as f32 / 2.)) as i64 == y_world
-                        {
-                            let allowed = self.schematic.tiles[&tile.texture_id.to_string()]
-                                .west
-                                .clone();
-
-                            self.constraint_map[x as usize][y as usize]
-                                .retain(|&to_retain| allowed.contains(&to_retain));
-                        }
-                    }
-                } else {
-                    // No chunk to stitch yet
-                    self.constraint_map[x as usize][y as usize].clear();
-                    continue;
                 }
 
                 if y + 1 < CHUNK_TILE_LENGTH {
@@ -201,77 +109,24 @@ impl WaveFunctionCollapse {
                         self.constraint_map[x as usize][y as usize]
                             .retain(|&to_retain| allowed.contains(&to_retain));
                     }
-                } else if let Some(north) = &self.adj.0 {
-                    for (tile, transform) in north.iter() {
-                        // Convert tile to world coords
-                        let x_world = self.coords.0 + (x * TILE_SIZE) - TILE_SIZE;
-                        let y_world = self.coords.1 + (y * TILE_SIZE) - TILE_SIZE;
-
-                        if (transform.translation.x - (TILE_SIZE as f32 / 2.)) as i64 == x_world
-                            && (transform.translation.y - (TILE_SIZE as f32 / 2.)) as i64
-                                - TILE_SIZE
-                                == y_world
-                        {
-                            let allowed = self.schematic.tiles[&tile.texture_id.to_string()]
-                                .south
-                                .clone();
-
-                            self.constraint_map[x as usize][y as usize]
-                                .retain(|&to_retain| allowed.contains(&to_retain));
-                        }
-                    }
-                } else {
-                    // No chunk to stitch yet
-                    self.constraint_map[x as usize][y as usize].clear();
-                    continue;
                 }
             }
         }
     }
 
     // Finds lowest non-zero entry in constraint map and returns it's index.
-    fn find_chunk_lowest_entropy(&self) -> Option<(usize, usize)> {
+    fn lowest_entropy(&self) -> Option<(usize, usize)> {
         info!("Calculating chunk entropy low");
 
         let mut index = None;
         let mut lowest = 0;
 
-        for x in 1..=CHUNK_TILE_LENGTH {
-            for y in 1..=CHUNK_TILE_LENGTH {
+        for x in 0..CHUNK_TILE_LENGTH {
+            for y in 0..CHUNK_TILE_LENGTH {
                 let n_constraints = self.constraint_map[x as usize][y as usize].len();
                 if n_constraints > 0 && (lowest == 0 || n_constraints < lowest) {
                     lowest = n_constraints;
                     index = Some((x as usize, y as usize))
-                }
-            }
-        }
-
-        if index.is_some() {
-            info!(
-                "Entropy minima: ({}, {})",
-                index.unwrap().0,
-                index.unwrap().1
-            );
-        }
-
-        index
-    }
-
-    fn find_stitched_lowest_entropy(&self) -> Option<(usize, usize)> {
-        info!("Calculating stitched entropy low");
-
-        let mut index = None;
-        let mut lowest = 0;
-
-        for x in 0..(CHUNK_TILE_LENGTH + 2) {
-            for y in 0..(CHUNK_TILE_LENGTH + 2) {
-                // Only the perimeter
-                if x == 0 || x == CHUNK_TILE_LENGTH + 1 || y == 0 || y == CHUNK_TILE_LENGTH + 1 {
-                    let n_constraints = self.constraint_map[x as usize][y as usize].len();
-                    if n_constraints > 0 && (lowest == 0 || n_constraints < lowest) {
-                        lowest = n_constraints;
-                        index = Some((x as usize, y as usize))
-                    }
                 }
             }
         }
@@ -302,25 +157,369 @@ impl WaveFunctionCollapse {
         Some((keys[idx as usize], 1))
     }
 
-    fn collapse_chunk_tile(&self, idx: (usize, usize)) -> Option<(u8, u8)> {
+    fn collapse_tile(&self, idx: (usize, usize)) -> Option<(u8, u8)> {
         info!("Collapsing tile");
         let mut rng = rand::rngs::StdRng::seed_from_u64(self.hash);
         let available = self.constraint_map[idx.0][idx.1].clone();
         let rand = rng.gen_range(0..available.len() as u8);
         Some((available.iter().nth(rand.into()).unwrap().clone(), 1))
     }
+}
 
-    fn collapse_stitched_tile(&self, idx: (usize, usize)) -> Option<(u8, u8)> {
+pub struct Stitcher {
+    hash: u64,
+    coords: Coords,
+    schematic: SchematicAsset,
+    chunk: Vec<(Tile, Transform)>,
+    adj: Adjacencies,
+    constraint_map: Vec<HashSet<u8>>,
+    tiles: Vec<Option<(u8, u8)>>,
+}
+
+impl Stitcher {
+    pub fn init(
+        world_seed: u64,
+        schematic: &SchematicAsset,
+        coords: Coords,
+        chunk: Vec<(Tile, Transform)>,
+        adj: Adjacencies,
+    ) -> Stitcher {
+        Stitcher {
+            hash: get_hash(world_seed, &coords),
+            coords: coords,
+            schematic: schematic.clone(),
+            chunk: chunk,
+            adj: adj.clone(),
+            constraint_map: Stitcher::init_stitching_constaints(schematic, adj),
+            tiles: vec![None; (4 * CHUNK_TILE_LENGTH + 4) as usize],
+        }
+    }
+
+    pub fn stitch(&mut self) -> &Vec<Option<(u8, u8)>> {
+        let mut has_next = true;
+
+        // Collapse Chunk
+        while has_next {
+            if let Some(next) = self.lowest_entropy() {
+                self.tiles[next] = self.collapse_tile(next);
+            } else {
+                has_next = false;
+            }
+
+            self.update_constraint_map();
+        }
+
+        &self.tiles
+    }
+
+    fn lowest_entropy(&self) -> Option<usize> {
+        info!("Calculating stitched entropy low");
+
+        let mut index = None;
+        let mut lowest = 0;
+
+        for (idx, constraint) in self.constraint_map.iter().enumerate() {
+            let n_constraints = constraint.len();
+            if n_constraints > 0 && (lowest == 0 || n_constraints < lowest) {
+                lowest = n_constraints;
+                index = Some(idx);
+            }
+        }
+
+        if index.is_some() {
+            info!("{:?}\n{:?}", self.constraint_map, self.adj);
+            info!("Entropy minima: ({})", index.unwrap());
+        }
+
+        index
+    }
+
+    // Checks for chunk adjacencies, connected adjacencies and stitched ajacencies
+    fn update_constraint_map(&mut self) {
+        for (idx, constraint) in self.constraint_map.iter_mut().enumerate() {
+            if constraint.is_empty() {
+                continue;
+            }
+
+            if self.tiles[idx].is_some() {
+                constraint.clear();
+                continue;
+            }
+
+            let side = idx / CHUNK_TILE_LENGTH as usize;
+
+            let rank = idx % CHUNK_TILE_LENGTH as usize;
+
+            // Check chunk
+            !todo!();
+
+            // Check connecting
+            if side == 0 || (side == 1 && rank == 0) {
+                if let Some(north) = &self.adj.0 {
+                    let perim_world_coords =
+                        super::get_perimeter_world_coord(&self.coords, side as i64, rank as i64);
+
+                    for (tile, transform) in north.iter() {
+                        // Convert tile to world coords
+                        if (transform.translation.x - (TILE_SIZE as f32 / 2.)) as i64
+                            == perim_world_coords.0
+                            && (transform.translation.y - (TILE_SIZE as f32 / 2.)) as i64
+                                - TILE_SIZE
+                                == perim_world_coords.1
+                        {
+                            let allowed = self.schematic.tiles[&tile.texture_id.to_string()]
+                                .south
+                                .clone();
+
+                            constraint.retain(|&to_retain| allowed.contains(&to_retain));
+                        }
+                    }
+                }
+            } else if side == 1 || (side == 2 && rank == 0) {
+                if let Some(east) = &self.adj.1 {
+                    let perim_world_coords =
+                        super::get_perimeter_world_coord(&self.coords, side as i64, rank as i64);
+
+                    for (tile, transform) in east.iter() {
+                        // Convert tile to world coords
+                        if (transform.translation.x - (TILE_SIZE as f32 / 2.)) as i64 - TILE_SIZE
+                            == perim_world_coords.0
+                            && (transform.translation.y - (TILE_SIZE as f32 / 2.)) as i64
+                                == perim_world_coords.1
+                        {
+                            let allowed = self.schematic.tiles[&tile.texture_id.to_string()]
+                                .west
+                                .clone();
+
+                            constraint.retain(|&to_retain| allowed.contains(&to_retain));
+                        }
+                    }
+                }
+            } else if side == 2 || (side == 3 && rank == 0) {
+                if let Some(south) = &self.adj.2 {
+                    let perim_world_coords =
+                        super::get_perimeter_world_coord(&self.coords, side as i64, rank as i64);
+
+                    for (tile, transform) in south.iter() {
+                        // Convert tile to world coords
+                        if (transform.translation.x - (TILE_SIZE as f32 / 2.)) as i64
+                            == perim_world_coords.0
+                            && (transform.translation.y - (TILE_SIZE as f32 / 2.)) as i64
+                                + TILE_SIZE
+                                == perim_world_coords.1
+                        {
+                            let allowed = self.schematic.tiles[&tile.texture_id.to_string()]
+                                .north
+                                .clone();
+
+                            constraint.retain(|&to_retain| allowed.contains(&to_retain));
+                        }
+                    }
+                }
+            } else if side == 3 || (side == 0 && rank == 0) {
+                if let Some(west) = &self.adj.3 {
+                    let perim_world_coords =
+                        super::get_perimeter_world_coord(&self.coords, side as i64, rank as i64);
+
+                    for (tile, transform) in west.iter() {
+                        // Convert tile to world coords
+                        if (transform.translation.x - (TILE_SIZE as f32 / 2.)) as i64
+                            == perim_world_coords.0 + TILE_SIZE
+                            && (transform.translation.y - (TILE_SIZE as f32 / 2.)) as i64
+                                == perim_world_coords.1
+                        {
+                            let allowed = self.schematic.tiles[&tile.texture_id.to_string()]
+                                .east
+                                .clone();
+
+                            constraint.retain(|&to_retain| allowed.contains(&to_retain));
+                        }
+                    }
+                }
+            }
+
+            // Check before and after idx
+            if side == 0 {
+                if rank == 0 {
+                    if self.tiles[self.tiles.len() - 1].is_some() {
+                        let allowed = self.schematic.tiles[&(self.tiles.len() - 1).to_string()]
+                            .north
+                            .clone();
+
+                        constraint.retain(|&to_retain| allowed.contains(&to_retain));
+                    }
+
+                    if self.tiles[idx + 1].is_some() {
+                        let allowed = self.schematic.tiles[&(idx + 1).to_string()].west.clone();
+
+                        constraint.retain(|&to_retain| allowed.contains(&to_retain));
+                    }
+                } else {
+                    if self.tiles[idx - 1].is_some() {
+                        let allowed = self.schematic.tiles[&(idx + 1).to_string()].east.clone();
+
+                        constraint.retain(|&to_retain| allowed.contains(&to_retain));
+                    }
+
+                    if self.tiles[idx + 1].is_some() {
+                        let allowed = self.schematic.tiles[&(idx + 1).to_string()].west.clone();
+
+                        constraint.retain(|&to_retain| allowed.contains(&to_retain));
+                    }
+                }
+            } else if side == 1 {
+                if rank == 0 {
+                    if self.tiles[idx - 1].is_some() {
+                        let allowed = self.schematic.tiles[&(self.tiles.len() - 1).to_string()]
+                            .north
+                            .clone();
+
+                        constraint.retain(|&to_retain| allowed.contains(&to_retain));
+                    }
+
+                    if self.tiles[idx + 1].is_some() {
+                        let allowed = self.schematic.tiles[&(idx + 1).to_string()].north.clone();
+
+                        constraint.retain(|&to_retain| allowed.contains(&to_retain));
+                    }
+                } else {
+                    if self.tiles[idx - 1].is_some() {
+                        let allowed = self.schematic.tiles[&(idx - 1).to_string()].south.clone();
+
+                        constraint.retain(|&to_retain| allowed.contains(&to_retain));
+                    }
+
+                    if self.tiles[idx + 1].is_some() {
+                        let allowed = self.schematic.tiles[&(idx + 1).to_string()].north.clone();
+
+                        constraint.retain(|&to_retain| allowed.contains(&to_retain));
+                    }
+                }
+            } else if side == 1 {
+                if rank == 0 {
+                    if self.tiles[idx - 1].is_some() {
+                        let allowed = self.schematic.tiles[&(idx - 1).to_string()].east.clone();
+
+                        constraint.retain(|&to_retain| allowed.contains(&to_retain));
+                    }
+
+                    if self.tiles[idx + 1].is_some() {
+                        let allowed = self.schematic.tiles[&(idx + 1).to_string()].north.clone();
+
+                        constraint.retain(|&to_retain| allowed.contains(&to_retain));
+                    }
+                } else {
+                    if self.tiles[idx - 1].is_some() {
+                        let allowed = self.schematic.tiles[&(idx - 1).to_string()].south.clone();
+
+                        constraint.retain(|&to_retain| allowed.contains(&to_retain));
+                    }
+
+                    if self.tiles[idx + 1].is_some() {
+                        let allowed = self.schematic.tiles[&(idx + 1).to_string()].north.clone();
+
+                        constraint.retain(|&to_retain| allowed.contains(&to_retain));
+                    }
+                }
+            } else if side == 2 {
+                if rank == 0 {
+                    if self.tiles[idx - 1].is_some() {
+                        let allowed = self.schematic.tiles[&(idx - 1).to_string()].south.clone();
+
+                        constraint.retain(|&to_retain| allowed.contains(&to_retain));
+                    }
+
+                    if self.tiles[idx + 1].is_some() {
+                        let allowed = self.schematic.tiles[&(idx + 1).to_string()].east.clone();
+
+                        constraint.retain(|&to_retain| allowed.contains(&to_retain));
+                    }
+                } else {
+                    if self.tiles[idx - 1].is_some() {
+                        let allowed = self.schematic.tiles[&(idx - 1).to_string()].west.clone();
+
+                        constraint.retain(|&to_retain| allowed.contains(&to_retain));
+                    }
+
+                    if self.tiles[idx + 1].is_some() {
+                        let allowed = self.schematic.tiles[&(idx + 1).to_string()].east.clone();
+
+                        constraint.retain(|&to_retain| allowed.contains(&to_retain));
+                    }
+                }
+            } else if side == 3 {
+                if rank == 0 {
+                    if self.tiles[idx - 1].is_some() {
+                        let allowed = self.schematic.tiles[&(idx - 1).to_string()].north.clone();
+
+                        constraint.retain(|&to_retain| allowed.contains(&to_retain));
+                    }
+
+                    if self.tiles[0].is_some() {
+                        let allowed = self.schematic.tiles["0"].south.clone();
+
+                        constraint.retain(|&to_retain| allowed.contains(&to_retain));
+                    }
+                } else {
+                    if self.tiles[idx - 1].is_some() {
+                        let allowed = self.schematic.tiles[&(idx - 1).to_string()].north.clone();
+
+                        constraint.retain(|&to_retain| allowed.contains(&to_retain));
+                    }
+
+                    if self.tiles[idx + 1].is_some() {
+                        let allowed = self.schematic.tiles[&(idx + 1).to_string()].south.clone();
+
+                        constraint.retain(|&to_retain| allowed.contains(&to_retain));
+                    }
+                }
+            }
+        }
+    }
+
+    fn collapse_tile(&self, idx: usize) -> Option<(u8, u8)> {
         info!("Collapsing stitched tile");
         let mut rng = rand::thread_rng();
-        let available = self.constraint_map[idx.0][idx.1].clone();
+        let available = self.constraint_map[idx].clone();
         let rand = rng.gen_range(0..available.len() as u8);
         Some((available.iter().nth(rand.into()).unwrap().clone(), 1))
     }
 
-    fn get_hash(world_seed: u64, coords: &Coords) -> u64 {
-        let mut hasher = DefaultHasher::new();
-        (coords.0 + coords.1 + world_seed as i64).hash(&mut hasher);
-        hasher.finish()
+    fn init_stitching_constaints(schematic: &SchematicAsset, adj: Adjacencies) -> Vec<HashSet<u8>> {
+        let unconstrained = init_constraints(schematic.clone());
+        let mut constraints = vec![HashSet::new(); (4 * CHUNK_TILE_LENGTH + 4) as usize];
+
+        for idx in 0..(4 * CHUNK_TILE_LENGTH + 4) {
+            let side = idx / CHUNK_TILE_LENGTH;
+
+            let rank = idx % CHUNK_TILE_LENGTH;
+
+            if adj.0.is_some() && (side == 0 || (side == 1 && rank == 0)) {
+                constraints[idx as usize] = unconstrained.clone();
+            } else if adj.1.is_some() && (side == 1 || (side == 2 && rank == 0)) {
+                constraints[idx as usize] = unconstrained.clone();
+            } else if adj.2.is_some() && (side == 2 || (side == 3 && rank == 0)) {
+                constraints[idx as usize] = unconstrained.clone();
+            } else if adj.3.is_some() && (side == 3 || (side == 0 && rank == 0)) {
+                constraints[idx as usize] = unconstrained.clone();
+            }
+        }
+
+        constraints
     }
+}
+
+fn init_constraints(schematic: SchematicAsset) -> HashSet<u8> {
+    // TODO: This can be simplified if the schematic is serialized to u8 rather than String value
+    schematic
+        .tiles
+        .keys()
+        .map(|key| key.parse::<u8>().unwrap())
+        .collect()
+}
+
+fn get_hash(world_seed: u64, coords: &Coords) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    (coords.0 + coords.1 + world_seed as i64).hash(&mut hasher);
+    hasher.finish()
 }

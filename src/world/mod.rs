@@ -1,6 +1,9 @@
 use bevy::prelude::*;
 
-use crate::world::wfc::WaveFunctionCollapse;
+use crate::{
+    components::Dirty,
+    world::wfc::{Stitcher, WaveFunctionCollapse},
+};
 
 use self::schematic::{SchematicAsset, SchematicLoader, SchematicResource};
 
@@ -8,13 +11,24 @@ mod schematic;
 
 mod wfc;
 
-const CHUNK_TILE_LENGTH: i64 = 8;
+const CHUNK_TILE_LENGTH: i64 = 2;
 const TILE_SIZE: i64 = 32;
 const CHUNK_SIZE: i64 = CHUNK_TILE_LENGTH * TILE_SIZE;
 
 const RENDER_DISTANCE: i8 = 3;
 
-type Coords = (i64, i64);
+#[derive(Copy, Clone, Default)]
+struct Coords(i64, i64);
+
+impl From<&Transform> for Coords {
+    fn from(value: &Transform) -> Self {
+        Coords(
+            (value.translation.x - (CHUNK_SIZE / 2) as f32) as i64,
+            (value.translation.y - (CHUNK_SIZE / 2) as f32) as i64,
+        )
+    }
+}
+
 type Adjacencies = (
     Option<Vec<(Tile, Transform)>>,
     Option<Vec<(Tile, Transform)>>,
@@ -28,22 +42,30 @@ pub struct ImageResource(Handle<Image>);
 #[derive(Resource)]
 pub struct AtlasResource(Handle<TextureAtlas>);
 
-#[derive(Clone, Component, Debug)]
+#[derive(Copy, Clone, Component, Debug)]
 pub struct Chunk;
 
-#[derive(Clone, Component, Debug)]
+#[derive(Copy, Clone, Component, Debug)]
 pub struct Tile {
     texture_id: u8,
+}
+
+// TODO: Refactor staged generation
+enum WorldState {
+    AssetLoad,
+    WorldGeneration,
+    Complete,
 }
 
 pub struct WorldPlugin;
 
 impl Plugin for WorldPlugin {
     fn build(&self, app: &mut App) {
-        app.init_asset::<SchematicAsset>();
-        app.init_asset_loader::<SchematicLoader>();
-        app.add_systems(Startup, load_schematic);
-        app.add_systems(Update, world_gen_system);
+        app.init_asset::<SchematicAsset>()
+            .init_asset_loader::<SchematicLoader>()
+            .add_systems(Startup, load_schematic)
+            .add_systems(Update, gen_chunks)
+            .add_systems(Update, gen_chunk_stitches);
     }
 }
 
@@ -59,16 +81,15 @@ fn load_schematic(asset_server: Res<AssetServer>, mut commands: Commands) {
     commands.insert_resource(ImageResource(sprite_sheet_handle));
 }
 
-fn world_gen_system(
+fn gen_chunks(
     mut commands: Commands,
     cam_pos: Query<&Transform, With<Camera>>,
     chunks: Query<(Entity, &Chunk, &Transform, &Children)>,
-    tiles: Query<(Entity, &Tile, &Transform)>,
     asset_server: Res<AssetServer>,
     schematic: Res<Assets<SchematicAsset>>,
     atlas_asset: ResMut<Assets<TextureAtlas>>,
 ) {
-    debug!("Updating world");
+    debug!("Updating chunk");
 
     // Retrieve assets
     if let Some(schematic_handle) = asset_server.get_handle::<SchematicAsset>("schematic.json") {
@@ -91,7 +112,6 @@ fn world_gen_system(
             create_chunks(
                 &chunks_in_range,
                 &chunks,
-                &tiles,
                 schematic,
                 schematic_handle,
                 image_handle,
@@ -105,10 +125,98 @@ fn world_gen_system(
     }
 }
 
+fn gen_chunk_stitches(
+    mut commands: Commands,
+    chunks_query: Query<(Entity, &Chunk, &Transform, &Children)>,
+    dirty_chunks_query: Query<(Entity, &Chunk, &Transform, &Children), With<Dirty>>,
+    tiles_query: Query<(Entity, &Tile, &Transform)>,
+    asset_server: Res<AssetServer>,
+    schematic: Res<Assets<SchematicAsset>>,
+    mut atlas_asset: ResMut<Assets<TextureAtlas>>,
+) {
+    debug!("Stitching chunks");
+
+    // Retrieve assets
+    if let Some(schematic_handle) = asset_server.get_handle::<SchematicAsset>("schematic.json") {
+        if let Some(image_handle) = asset_server.get_handle::<Image>("world/terrain_1.png") {
+            if dirty_chunks_query.is_empty() {
+                debug!("No chunks needing to be stitched.");
+                return;
+            }
+
+            let schematic = schematic
+                .get(&schematic_handle)
+                .expect("Error loading in schematic!");
+
+            for (entity, _, transform, children) in dirty_chunks_query.iter() {
+                // Get adjacencies to chunks
+
+                let coords = Coords::from(transform);
+
+                let chunk = get_chunk_tiles((entity, children), &tiles_query);
+
+                let adj =
+                    get_connected_chunks(&Coords::from(transform), &chunks_query, &tiles_query);
+
+                // Stitch together chunk with neighbors
+                let mut stitcher = Stitcher::init(42, schematic, coords, chunk, adj);
+                let edges = stitcher.stitch();
+
+                let atlas = TextureAtlas::from_grid(
+                    image_handle.clone(),
+                    Vec2::new(TILE_SIZE as f32, TILE_SIZE as f32),
+                    10,
+                    16,
+                    None,
+                    None,
+                );
+
+                let atlas_handle = atlas_asset.add(atlas);
+
+                commands
+                    .entity(entity)
+                    .with_children(|parent| {
+                        // Add tiles to chunk
+                        for (idx, tile) in edges.iter().enumerate() {
+                            if let Some((sprite_idx, _)) = tile {
+                                let side = idx / CHUNK_TILE_LENGTH as usize;
+                                let rank = idx % CHUNK_TILE_LENGTH as usize;
+
+                                // North, East, South, West
+                                let perim_tile_coords =
+                                    get_perimeter_world_coord(&coords, side as i64, rank as i64);
+
+                                let sprite_bundle = SpriteSheetBundle {
+                                    texture_atlas: atlas_handle.clone(),
+                                    sprite: TextureAtlasSprite::new(*sprite_idx as usize),
+                                    ..Default::default()
+                                };
+
+                                parent
+                                    .spawn(sprite_bundle)
+                                    .insert(Transform::from_translation(Vec3::new(
+                                        (perim_tile_coords.0 as f32 * TILE_SIZE as f32)
+                                            - (TILE_SIZE / 2) as f32,
+                                        (perim_tile_coords.1 as f32 * TILE_SIZE as f32)
+                                            - (TILE_SIZE / 2) as f32,
+                                        0.,
+                                    )))
+                                    .insert(Visibility::Inherited)
+                                    .insert(Tile {
+                                        texture_id: *sprite_idx,
+                                    });
+                            }
+                        }
+                    })
+                    .remove::<Dirty>();
+            }
+        }
+    }
+}
+
 fn create_chunks(
     chunks_in_range: &Vec<Coords>,
     chunks: &Query<(Entity, &Chunk, &Transform, &Children)>,
-    tiles: &Query<(Entity, &Tile, &Transform)>,
     schematic: Res<Assets<SchematicAsset>>,
     schematic_handle: Handle<SchematicAsset>,
     image_handle: Handle<Image>,
@@ -152,18 +260,14 @@ fn create_chunks(
 
             let atlas_handle = atlas_asset.add(atlas);
 
-            let mut wfc = WaveFunctionCollapse::init(
-                42,
-                schematic.clone(),
-                in_range.clone(),
-                get_adjacent(in_range, &chunks, &tiles),
-            );
+            let mut wfc = WaveFunctionCollapse::init(42, schematic, in_range.clone());
 
-            // Tiles is CHUNK_TILE_LENGTH + 2 x CHUNK_TILE_LENGTH + 2
+            // Tiles is CHUNK_TILE_LENGTH x CHUNK_TILE_LENGTH
             let tiles = wfc.collapse();
 
             let chunk_bundle = (
                 Chunk {},
+                Dirty {},
                 Transform::from_translation(Vec3::new(
                     in_range.0 as f32 + (CHUNK_SIZE as f32 / 2.),
                     in_range.1 as f32 + (CHUNK_SIZE as f32 / 2.),
@@ -174,8 +278,8 @@ fn create_chunks(
             );
 
             commands.spawn(chunk_bundle).with_children(|parent| {
-                for x in 0..(CHUNK_TILE_LENGTH + 2) {
-                    for y in 0..(CHUNK_TILE_LENGTH + 2) {
+                for x in 0..CHUNK_TILE_LENGTH {
+                    for y in 0..CHUNK_TILE_LENGTH {
                         if let Some(tile) = tiles[x as usize][y as usize] {
                             let sprite_bundle = SpriteSheetBundle {
                                 texture_atlas: atlas_handle.clone(),
@@ -186,8 +290,8 @@ fn create_chunks(
                             parent
                                 .spawn(sprite_bundle)
                                 .insert(Transform::from_translation(Vec3::new(
-                                    ((x - 1) as f32 * TILE_SIZE as f32) - ((TILE_SIZE) / 2) as f32,
-                                    ((y - 1) as f32 * TILE_SIZE as f32) - (TILE_SIZE / 2) as f32,
+                                    (x as f32 * TILE_SIZE as f32) - (TILE_SIZE / 2) as f32,
+                                    (y as f32 * TILE_SIZE as f32) - (TILE_SIZE / 2) as f32,
                                     0.,
                                 )))
                                 .insert(Visibility::Inherited)
@@ -226,7 +330,7 @@ fn remove_stale_chunks(
     }
 }
 
-fn get_adjacent(
+fn get_connected_chunks(
     coords: &Coords,
     chunks: &Query<(Entity, &Chunk, &Transform, &Children)>,
     tiles: &Query<(Entity, &Tile, &Transform)>,
@@ -234,15 +338,13 @@ fn get_adjacent(
     let (mut north, mut east, mut south, mut west) =
         (Option::None, Option::None, Option::None, Option::None);
 
-    // TODO: Need to fix timing of query, chunks may be generated during this step so adjacency check is only accurate as of beginning of step
-
     for (entity, _, transform, children) in chunks.iter() {
         let to_check = (
             (transform.translation.x - (CHUNK_SIZE as f32 / 2.)) as i64,
             (transform.translation.y - (CHUNK_SIZE as f32 / 2.)) as i64,
         );
 
-        info!("Checking adjacenties for ({},{})", to_check.0, to_check.1);
+        debug!("Checking adjacenties for ({},{})", to_check.0, to_check.1);
 
         if coords.0 == to_check.0 && coords.1 + CHUNK_SIZE + TILE_SIZE == to_check.1 {
             north = Some(get_chunk_tiles((entity, children), tiles));
@@ -265,7 +367,7 @@ fn get_chunk_tiles(
     let mut containing: Vec<(Tile, Transform)> = Vec::new();
 
     for child in chunk_children.1.iter() {
-        info!("Found child");
+        debug!("Found child");
         if let Ok((_, tile, transform)) = tiles.get(*child) {
             containing.push((tile.clone(), transform.clone()));
         }
@@ -285,7 +387,7 @@ fn get_chunks_in_range(pos: (f32, f32)) -> Vec<Coords> {
     // Feed offset back into linear equation and extrapolate to the render distance
     for x in -RENDER_DISTANCE..=RENDER_DISTANCE {
         for y in -RENDER_DISTANCE..=RENDER_DISTANCE {
-            coords.push((
+            coords.push(Coords(
                 ((offset_x as i64 + x as i64) * (CHUNK_SIZE + TILE_SIZE)) - TILE_SIZE,
                 ((offset_y as i64 + y as i64) * (CHUNK_SIZE + TILE_SIZE)) - TILE_SIZE,
             ));
@@ -293,4 +395,25 @@ fn get_chunks_in_range(pos: (f32, f32)) -> Vec<Coords> {
     }
 
     coords
+}
+
+fn get_perimeter_world_coord(coords: &Coords, side: i64, rank: i64) -> Coords {
+    match side {
+        0 => Coords(
+            coords.0 - TILE_SIZE + (rank * TILE_SIZE),
+            coords.1 + CHUNK_SIZE,
+        ),
+        1 => Coords(
+            coords.0 + CHUNK_SIZE,
+            coords.1 + CHUNK_SIZE - (rank * TILE_SIZE),
+        ),
+        2 => Coords(
+            coords.0 + CHUNK_SIZE - (rank * TILE_SIZE),
+            coords.1 - TILE_SIZE,
+        ),
+        _ => Coords(
+            coords.0 - TILE_SIZE,
+            coords.1 - TILE_SIZE + (rank * TILE_SIZE),
+        ),
+    }
 }

@@ -1,19 +1,265 @@
 {
+    "0": {
+        "name": "bottom_right_path",
+        "sheet": "terrain_1",
+        "weight": 90,
+        "0": [],
+        "1": [
+            1
+        ],
+        "2": [
+            10
+        ],
+        "3": []
+    },
+    "1": {
+        "name": "bottom_path",
+        "sheet": "terrain_1",
+        "weight": 10,
+        "0": [],
+        "1": [
+            2
+        ],
+        "2": [
+            11
+        ],
+        "3": [
+            0
+        ]
+    },
+    "2": {
+        "name": "bottom_left_path",
+        "sheet": "terrain_1",
+        "weight": 10,
+        "0": [],
+        "1": [
+            3
+        ],
+        "2": [
+            12
+        ],
+        "3": [
+            1
+        ]
+    },
+    "3": {
+        "name": "middle_bottom_path",
+        "sheet": "terrain_1",
+        "weight": 10,
+        "0": [],
+        "1": [
+            4
+        ],
+        "2": [],
+        "3": [
+            2
+        ]
+    },
+    "4": {
+        "name": "top_left_dirt_edge",
+        "sheet": "terrain_1",
+        "weight": 10,
+        "0": [],
+        "1": [
+            5
+        ],
+        "2": [
+            14
+        ],
+        "3": [
+            3
+        ]
+    },
+    "5": {
+        "name": "top_dirt_edge",
+        "sheet": "terrain_1",
+        "weight": 10,
+        "0": [],
+        "1": [
+            6
+        ],
+        "2": [],
+        "3": [
+            4
+        ]
+    },
+    "6": {
+        "name": "top_right_dirt_edge",
+        "sheet": "terrain_1",
+        "weight": 10,
+        "0": [],
+        "1": [
+            7
+        ],
+        "2": [],
+        "3": [
+            5
+        ]
+    },
+    "7": {
+        "name": "left_top_right_dirt_edge",
+        "sheet": "terrain_1",
+        "weight": 10,
+        "0": [],
+        "1": [
+            8
+        ],
+        "2": [],
+        "3": [
+            6
+        ]
+    },
+    "8": {
+        "name": "dirt_stairs_left",
+        "sheet": "terrain_1",
+        "weight": 10,
+        "0": [],
+        "1": [
+            15
+        ],
+        "2": [],
+        "3": [
+            7
+        ]
+    },
+    "9": {
+        "name": "dirt_stairs_right",
+        "sheet": "terrain_1",
+        "weight": 10,
+        "0": [],
+        "1": [],
+        "2": [],
+        "3": [
+            8,
+            15
+        ]
+    },
+    "10": {
+        "name": "path_right",
+        "sheet": "terrain_1",
+        "weight": 10,
+        "0": [
+            0,
+            10
+        ],
+        "1": [
+            11
+        ],
+        "2": [
+            10
+        ],
+        "3": [
+            9
+        ]
+    },
     "11": {
         "name": "path",
         "sheet": "terrain_1",
         "weight": 10,
         "0": [
+            1,
             11
         ],
         "1": [
+            12,
             11
         ],
         "2": [
             11
         ],
         "3": [
+            10,
             11
+        ]
+    },
+    "12": {
+        "name": "path_left",
+        "sheet": "terrain_1",
+        "weight": 10,
+        "0": [
+            2,
+            12
+        ],
+        "1": [
+            13
+        ],
+        "2": [
+            12
+        ],
+        "3": [
+            11
+        ]
+    },
+    "13": {
+        "name": "path_middle",
+        "sheet": "terrain_1",
+        "weight": 10,
+        "0": [
+            13
+        ],
+        "1": [
+            1,
+            9,
+            14
+        ],
+        "2": [
+            13
+        ],
+        "3": [
+            12
+        ]
+    },
+    "14": {
+        "name": "dirt_left_edge",
+        "sheet": "terrain_1",
+        "weight": 10,
+        "0": [
+            5,
+            14
+        ],
+        "1": [
+            15
+        ],
+        "2": [
+            14
+        ],
+        "3": [
+            13
+        ]
+    },
+    "15": {
+        "name": "dirt_middle",
+        "sheet": "terrain_1",
+        "weight": 10,
+        "0": [
+            6,
+            15
+        ],
+        "1": [
+            15
+        ],
+        "2": [
+            15
+        ],
+        "3": [
+            14,
+            15
+        ]
+    },
+    "16": {
+        "name": "dirt_right_edge",
+        "sheet": "terrain_1",
+        "weight": 10,
+        "0": [
+            7,
+            16
+        ],
+        "1": [],
+        "2": [
+            16
+        ],
+        "3": [
+            15
         ]
     }
 }
