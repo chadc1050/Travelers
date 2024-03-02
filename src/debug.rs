@@ -29,11 +29,11 @@ fn toggle_debug_info(
     asset_server: Res<AssetServer>,
     mut commands: Commands,
     input: Res<Input<KeyCode>>,
-    query: Query<(Entity, &DebugInfo)>,
+    query: Query<Entity, With<DebugInfo>>,
 ) {
     if let Some(font_handle) = asset_server.get_handle::<Font>("fonts/FiraMono-Medium.ttf") {
         if input.just_pressed(KeyCode::F3) {
-            if let Ok((entity, _)) = query.get_single() {
+            if let Ok(entity) = query.get_single() {
                 // Delete it
                 commands.entity(entity).despawn();
             } else {
