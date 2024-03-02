@@ -12,7 +12,7 @@ use serde::Deserialize;
 #[derive(Asset, Clone, Debug, TypePath, Deserialize)]
 pub struct SchematicAsset {
     #[serde(flatten)]
-    pub tiles: HashMap<String, TileSchematic>,
+    pub tiles: HashMap<u8, TileSchematic>,
 }
 
 #[derive(Resource)]
@@ -52,12 +52,19 @@ impl AssetLoader for SchematicLoader {
         Box::pin(async move {
             let mut bytes = Vec::new();
             _ = reader.read_to_end(&mut bytes).await;
-            let serialized = serde_json::from_slice::<SchematicAsset>(&bytes);
+            let serialized = serde_json::from_slice::<HashMap<String, TileSchematic>>(&bytes);
 
             match serialized {
                 Ok(data) => {
                     info!("Successfully loaded asset");
-                    Ok(data)
+
+                    let mut cnv = HashMap::new();
+
+                    for (key, val) in data {
+                        cnv.insert(key.parse::<u8>().unwrap(), val);
+                    }
+
+                    Ok(SchematicAsset { tiles: cnv })
                 }
                 Err(err) => Err(Self::Error::new(
                     ErrorKind::InvalidData,

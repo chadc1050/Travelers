@@ -29,7 +29,7 @@ impl WaveFunctionCollapse {
             schematic: schematic.clone(),
             constraint_map: vec![
                 vec![
-                    Self::init_constraints(schematic.clone());
+                    schematic.tiles.clone().into_keys().collect();
                     CHUNK_TILE_LENGTH as usize
                 ];
                 CHUNK_TILE_LENGTH as usize
@@ -70,7 +70,7 @@ impl WaveFunctionCollapse {
 
                 if x - 1 >= 0 {
                     if let Some(left) = self.tiles[(x - 1) as usize][y as usize] {
-                        let allowed = self.schematic.tiles[&left.0.to_string()].east.clone();
+                        let allowed = self.schematic.tiles[&left.0].east.clone();
 
                         self.constraint_map[x as usize][y as usize]
                             .retain(|&to_retain| allowed.contains(&to_retain));
@@ -79,7 +79,7 @@ impl WaveFunctionCollapse {
 
                 if y - 1 >= 0 {
                     if let Some(down) = self.tiles[x as usize][(y - 1) as usize] {
-                        let allowed = self.schematic.tiles[&down.0.to_string()].north.clone();
+                        let allowed = self.schematic.tiles[&down.0].north.clone();
 
                         self.constraint_map[x as usize][y as usize]
                             .retain(|&to_retain| allowed.contains(&to_retain));
@@ -88,7 +88,7 @@ impl WaveFunctionCollapse {
 
                 if x + 1 < CHUNK_TILE_LENGTH {
                     if let Some(right) = self.tiles[(x + 1) as usize][y as usize] {
-                        let allowed = self.schematic.tiles[&right.0.to_string()].west.clone();
+                        let allowed = self.schematic.tiles[&right.0].west.clone();
 
                         self.constraint_map[x as usize][y as usize]
                             .retain(|&to_retain| allowed.contains(&to_retain));
@@ -97,7 +97,7 @@ impl WaveFunctionCollapse {
 
                 if y + 1 < CHUNK_TILE_LENGTH {
                     if let Some(up) = self.tiles[x as usize][(y + 1) as usize] {
-                        let allowed = self.schematic.tiles[&up.0.to_string()].south.clone();
+                        let allowed = self.schematic.tiles[&up.0].south.clone();
 
                         self.constraint_map[x as usize][y as usize]
                             .retain(|&to_retain| allowed.contains(&to_retain));
@@ -139,12 +139,7 @@ impl WaveFunctionCollapse {
     fn scratch(&self) -> Option<(u8, u8)> {
         let mut rng = rand::rngs::StdRng::seed_from_u64(self.hash);
 
-        let keys: Vec<u8> = self
-            .schematic
-            .tiles
-            .keys()
-            .map(|key| key.parse::<u8>().unwrap())
-            .collect();
+        let keys: Vec<u8> = self.schematic.tiles.clone().into_keys().collect();
 
         let idx = rng.gen_range(0..(keys.len() as u8));
         Some((keys[idx as usize], 1))
@@ -156,15 +151,6 @@ impl WaveFunctionCollapse {
         let available = self.constraint_map[idx.0][idx.1].clone();
         let rand = rng.gen_range(0..available.len() as u8);
         Some((available.iter().nth(rand.into()).unwrap().clone(), 1))
-    }
-
-    fn init_constraints(schematic: SchematicAsset) -> HashSet<u8> {
-        // TODO: This can be simplified if the schematic is serialized to u8 rather than String value
-        schematic
-            .tiles
-            .keys()
-            .map(|key| key.parse::<u8>().unwrap())
-            .collect()
     }
 
     fn get_hash(world_seed: u64, coords: &Coords) -> u64 {

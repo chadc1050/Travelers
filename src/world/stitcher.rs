@@ -104,9 +104,7 @@ impl Stitcher {
                                 - TILE_SIZE
                                 == perim_world_coords.1
                         {
-                            let allowed = self.schematic.tiles[&tile.texture_id.to_string()]
-                                .south
-                                .clone();
+                            let allowed = self.schematic.tiles[&tile.texture_id].south.clone();
 
                             constraint.retain(|&to_retain| allowed.contains(&to_retain));
                         }
@@ -128,9 +126,7 @@ impl Stitcher {
                                 + TILE_SIZE
                                 == perim_world_coords.1
                         {
-                            let allowed = self.schematic.tiles[&tile.texture_id.to_string()]
-                                .south
-                                .clone();
+                            let allowed = self.schematic.tiles[&tile.texture_id].south.clone();
 
                             constraint.retain(|&to_retain| allowed.contains(&to_retain));
                         }
@@ -148,9 +144,7 @@ impl Stitcher {
                             && (transform.translation.y - (TILE_SIZE as f32 / 2.)) as i64
                                 == perim_world_coords.1
                         {
-                            let allowed = self.schematic.tiles[&tile.texture_id.to_string()]
-                                .west
-                                .clone();
+                            let allowed = self.schematic.tiles[&tile.texture_id].west.clone();
 
                             constraint.retain(|&to_retain| allowed.contains(&to_retain));
                         }
@@ -171,9 +165,7 @@ impl Stitcher {
                             && (transform.translation.y - (TILE_SIZE as f32 / 2.)) as i64
                                 == perim_world_coords.1
                         {
-                            let allowed = self.schematic.tiles[&tile.texture_id.to_string()]
-                                .south
-                                .clone();
+                            let allowed = self.schematic.tiles[&tile.texture_id].south.clone();
 
                             constraint.retain(|&to_retain| allowed.contains(&to_retain));
                         }
@@ -192,9 +184,7 @@ impl Stitcher {
                                 + TILE_SIZE
                                 == perim_world_coords.1
                         {
-                            let allowed = self.schematic.tiles[&tile.texture_id.to_string()]
-                                .north
-                                .clone();
+                            let allowed = self.schematic.tiles[&tile.texture_id].north.clone();
 
                             constraint.retain(|&to_retain| allowed.contains(&to_retain));
                         }
@@ -216,9 +206,7 @@ impl Stitcher {
                                 - TILE_SIZE
                                 == perim_world_coords.1
                         {
-                            let allowed = self.schematic.tiles[&tile.texture_id.to_string()]
-                                .south
-                                .clone();
+                            let allowed = self.schematic.tiles[&tile.texture_id].south.clone();
 
                             constraint.retain(|&to_retain| allowed.contains(&to_retain));
                         }
@@ -236,9 +224,7 @@ impl Stitcher {
                             && (transform.translation.y - (TILE_SIZE as f32 / 2.)) as i64
                                 == perim_world_coords.1
                         {
-                            let allowed = self.schematic.tiles[&tile.texture_id.to_string()]
-                                .east
-                                .clone();
+                            let allowed = self.schematic.tiles[&tile.texture_id].east.clone();
 
                             constraint.retain(|&to_retain| allowed.contains(&to_retain));
                         }
@@ -259,9 +245,7 @@ impl Stitcher {
                             && (transform.translation.y - (TILE_SIZE as f32 / 2.)) as i64
                                 == perim_world_coords.1
                         {
-                            let allowed = self.schematic.tiles[&tile.texture_id.to_string()]
-                                .south
-                                .clone();
+                            let allowed = self.schematic.tiles[&tile.texture_id].south.clone();
 
                             constraint.retain(|&to_retain| allowed.contains(&to_retain));
                         }
@@ -274,7 +258,7 @@ impl Stitcher {
                 if rank == 0 {
                     if self.tiles[self.tiles.len() - 1].is_some() {
                         let allowed = self.schematic.tiles
-                            [&self.tiles[self.tiles.len() - 1].unwrap().0.to_string()]
+                            [&self.tiles[self.tiles.len() - 1].unwrap().0]
                             .north
                             .clone();
 
@@ -282,8 +266,7 @@ impl Stitcher {
                     }
 
                     if self.tiles[idx + 1].is_some() {
-                        let allowed = self.schematic.tiles
-                            [&self.tiles[idx + 1].unwrap().0.to_string()]
+                        let allowed = self.schematic.tiles[&self.tiles[idx + 1].unwrap().0]
                             .west
                             .clone();
 
@@ -291,8 +274,7 @@ impl Stitcher {
                     }
                 } else {
                     if self.tiles[idx - 1].is_some() {
-                        let allowed = self.schematic.tiles
-                            [&self.tiles[idx - 1].unwrap().0.to_string()]
+                        let allowed = self.schematic.tiles[&self.tiles[idx - 1].unwrap().0]
                             .east
                             .clone();
 
@@ -300,8 +282,7 @@ impl Stitcher {
                     }
 
                     if self.tiles[idx + 1].is_some() {
-                        let allowed = self.schematic.tiles
-                            [&self.tiles[idx + 1].unwrap().0.to_string()]
+                        let allowed = self.schematic.tiles[&self.tiles[idx + 1].unwrap().0]
                             .west
                             .clone();
 
@@ -311,8 +292,7 @@ impl Stitcher {
             } else if side == 1 {
                 if rank == 0 {
                     if self.tiles[idx - 1].is_some() {
-                        let allowed = self.schematic.tiles
-                            [&self.tiles[idx - 1].unwrap().0.to_string()]
+                        let allowed = self.schematic.tiles[&self.tiles[idx - 1].unwrap().0]
                             .north
                             .clone();
 
@@ -320,8 +300,7 @@ impl Stitcher {
                     }
 
                     if self.tiles[idx + 1].is_some() {
-                        let allowed = self.schematic.tiles
-                            [&self.tiles[idx + 1].unwrap().0.to_string()]
+                        let allowed = self.schematic.tiles[&self.tiles[idx + 1].unwrap().0]
                             .north
                             .clone();
 
@@ -329,8 +308,7 @@ impl Stitcher {
                     }
                 } else {
                     if self.tiles[idx - 1].is_some() {
-                        let allowed = self.schematic.tiles
-                            [&self.tiles[idx - 1].unwrap().0.to_string()]
+                        let allowed = self.schematic.tiles[&self.tiles[idx - 1].unwrap().0]
                             .south
                             .clone();
 
@@ -338,8 +316,7 @@ impl Stitcher {
                     }
 
                     if self.tiles[idx + 1].is_some() {
-                        let allowed = self.schematic.tiles
-                            [&self.tiles[idx + 1].unwrap().0.to_string()]
+                        let allowed = self.schematic.tiles[&self.tiles[idx + 1].unwrap().0]
                             .north
                             .clone();
 
@@ -349,8 +326,7 @@ impl Stitcher {
             } else if side == 1 {
                 if rank == 0 {
                     if self.tiles[idx - 1].is_some() {
-                        let allowed = self.schematic.tiles
-                            [&self.tiles[idx - 1].unwrap().0.to_string()]
+                        let allowed = self.schematic.tiles[&self.tiles[idx - 1].unwrap().0]
                             .east
                             .clone();
 
@@ -358,8 +334,7 @@ impl Stitcher {
                     }
 
                     if self.tiles[idx + 1].is_some() {
-                        let allowed = self.schematic.tiles
-                            [&self.tiles[idx + 1].unwrap().0.to_string()]
+                        let allowed = self.schematic.tiles[&self.tiles[idx + 1].unwrap().0]
                             .north
                             .clone();
 
@@ -367,8 +342,7 @@ impl Stitcher {
                     }
                 } else {
                     if self.tiles[idx - 1].is_some() {
-                        let allowed = self.schematic.tiles
-                            [&self.tiles[idx - 1].unwrap().0.to_string()]
+                        let allowed = self.schematic.tiles[&self.tiles[idx - 1].unwrap().0]
                             .south
                             .clone();
 
@@ -376,8 +350,7 @@ impl Stitcher {
                     }
 
                     if self.tiles[idx + 1].is_some() {
-                        let allowed = self.schematic.tiles
-                            [&self.tiles[idx + 1].unwrap().0.to_string()]
+                        let allowed = self.schematic.tiles[&self.tiles[idx + 1].unwrap().0]
                             .north
                             .clone();
 
@@ -387,8 +360,7 @@ impl Stitcher {
             } else if side == 2 {
                 if rank == 0 {
                     if self.tiles[idx - 1].is_some() {
-                        let allowed = self.schematic.tiles
-                            [&self.tiles[idx - 1].unwrap().0.to_string()]
+                        let allowed = self.schematic.tiles[&self.tiles[idx - 1].unwrap().0]
                             .south
                             .clone();
 
@@ -396,8 +368,7 @@ impl Stitcher {
                     }
 
                     if self.tiles[idx + 1].is_some() {
-                        let allowed = self.schematic.tiles
-                            [&self.tiles[idx + 1].unwrap().0.to_string()]
+                        let allowed = self.schematic.tiles[&self.tiles[idx + 1].unwrap().0]
                             .east
                             .clone();
 
@@ -405,8 +376,7 @@ impl Stitcher {
                     }
                 } else {
                     if self.tiles[idx - 1].is_some() {
-                        let allowed = self.schematic.tiles
-                            [&self.tiles[idx - 1].unwrap().0.to_string()]
+                        let allowed = self.schematic.tiles[&self.tiles[idx - 1].unwrap().0]
                             .west
                             .clone();
 
@@ -414,8 +384,7 @@ impl Stitcher {
                     }
 
                     if self.tiles[idx + 1].is_some() {
-                        let allowed = self.schematic.tiles
-                            [&self.tiles[idx + 1].unwrap().0.to_string()]
+                        let allowed = self.schematic.tiles[&self.tiles[idx + 1].unwrap().0]
                             .east
                             .clone();
 
@@ -425,8 +394,7 @@ impl Stitcher {
             } else if side == 3 {
                 if rank == 0 {
                     if self.tiles[idx - 1].is_some() {
-                        let allowed = self.schematic.tiles
-                            [&self.tiles[idx - 1].unwrap().0.to_string()]
+                        let allowed = self.schematic.tiles[&self.tiles[idx - 1].unwrap().0]
                             .north
                             .clone();
 
@@ -434,16 +402,13 @@ impl Stitcher {
                     }
 
                     if self.tiles[idx + 1].is_some() {
-                        let allowed = self.schematic.tiles[&self.tiles[0].unwrap().0.to_string()]
-                            .west
-                            .clone();
+                        let allowed = self.schematic.tiles[&self.tiles[0].unwrap().0].west.clone();
 
                         constraint.retain(|&to_retain| allowed.contains(&to_retain));
                     }
                 } else if rank == CHUNK_TILE_LENGTH as usize {
                     if self.tiles[idx - 1].is_some() {
-                        let allowed = self.schematic.tiles
-                            [&self.tiles[idx - 1].unwrap().0.to_string()]
+                        let allowed = self.schematic.tiles[&self.tiles[idx - 1].unwrap().0]
                             .north
                             .clone();
 
@@ -451,7 +416,7 @@ impl Stitcher {
                     }
 
                     if self.tiles[0].is_some() {
-                        let allowed = self.schematic.tiles[&self.tiles[0].unwrap().0.to_string()]
+                        let allowed = self.schematic.tiles[&self.tiles[0].unwrap().0]
                             .south
                             .clone();
 
@@ -459,8 +424,7 @@ impl Stitcher {
                     }
                 } else {
                     if self.tiles[idx - 1].is_some() {
-                        let allowed = self.schematic.tiles
-                            [&self.tiles[idx - 1].unwrap().0.to_string()]
+                        let allowed = self.schematic.tiles[&self.tiles[idx - 1].unwrap().0]
                             .north
                             .clone();
 
@@ -468,8 +432,7 @@ impl Stitcher {
                     }
 
                     if self.tiles[idx + 1].is_some() {
-                        let allowed = self.schematic.tiles
-                            [&self.tiles[idx + 1].unwrap().0.to_string()]
+                        let allowed = self.schematic.tiles[&self.tiles[idx + 1].unwrap().0]
                             .south
                             .clone();
 
@@ -489,7 +452,7 @@ impl Stitcher {
     }
 
     fn init_stitching_constaints(schematic: &SchematicAsset, adj: Adjacencies) -> Vec<HashSet<u8>> {
-        let unconstrained = Self::init_constraints(schematic.clone());
+        let unconstrained: HashSet<u8> = schematic.tiles.clone().into_keys().collect();
         let mut constraints = vec![HashSet::new(); (4 * CHUNK_TILE_LENGTH + 4) as usize];
 
         for idx in 0..(4 * CHUNK_TILE_LENGTH + 4) {
@@ -509,14 +472,5 @@ impl Stitcher {
         }
 
         constraints
-    }
-
-    fn init_constraints(schematic: SchematicAsset) -> HashSet<u8> {
-        // TODO: This can be simplified if the schematic is serialized to u8 rather than String value
-        schematic
-            .tiles
-            .keys()
-            .map(|key| key.parse::<u8>().unwrap())
-            .collect()
     }
 }
