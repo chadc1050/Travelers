@@ -195,10 +195,12 @@ fn gen_chunk_stitches(
                                 };
 
                                 let x_rel = (perim_tile_coords.0 - coords.0) as f32
-                                    + (TILE_SIZE as f32 / 2.);
+                                    + (TILE_SIZE as f32 / 2.)
+                                    - (CHUNK_SIZE as f32 / 2.);
 
                                 let y_rel = (perim_tile_coords.1 - coords.1) as f32
-                                    + (TILE_SIZE as f32 / 2.);
+                                    + (TILE_SIZE as f32 / 2.)
+                                    - (CHUNK_SIZE as f32 / 2.);
 
                                 info!("Spawning stitched tile to chunk ({}, {}) at relative coordinates: ({},{})", coords.0, coords.1, x_rel, y_rel);
 
@@ -293,13 +295,11 @@ fn create_chunks(
                                 ..Default::default()
                             };
 
-                            let x_rel = (-CHUNK_SIZE as f32 / 2.)
-                                + (x as f32 * TILE_SIZE as f32)
-                                + (TILE_SIZE as f32 / 2.);
+                            let x_rel = (x as f32 * TILE_SIZE as f32) + (TILE_SIZE as f32 / 2.)
+                                - (CHUNK_SIZE as f32 / 2.);
 
-                            let y_rel = (-CHUNK_SIZE as f32 / 2.)
-                                + (y as f32 * TILE_SIZE as f32)
-                                + (TILE_SIZE as f32 / 2.);
+                            let y_rel = (y as f32 * TILE_SIZE as f32) + (TILE_SIZE as f32 / 2.)
+                                - (CHUNK_SIZE as f32 / 2.);
 
                             info!(
                                 "Spawning tile to chunk ({}, {}) at relative coordinates: ({},{})",
