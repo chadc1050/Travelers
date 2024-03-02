@@ -1,15 +1,14 @@
 use bevy::prelude::*;
 
-use crate::{
-    components::Dirty,
-    world::wfc::{Stitcher, WaveFunctionCollapse},
-};
+use crate::{components::Dirty, world::stitcher::Stitcher, world::wfc::WaveFunctionCollapse};
 
 use self::schematic::{SchematicAsset, SchematicLoader, SchematicResource};
 
 mod schematic;
 
 mod wfc;
+
+mod stitcher;
 
 const CHUNK_TILE_LENGTH: i64 = 8;
 const TILE_SIZE: i64 = 32;
@@ -159,7 +158,7 @@ fn gen_chunk_stitches(
                     get_connected_chunks(&Coords::from(transform), &chunks_query, &tiles_query);
 
                 // Stitch together chunk with neighbors
-                let mut stitcher = Stitcher::init(42, schematic, coords, chunk, adj);
+                let mut stitcher = Stitcher::init(schematic, coords, chunk, adj);
                 let edges = stitcher.stitch();
 
                 let atlas = TextureAtlas::from_grid(
