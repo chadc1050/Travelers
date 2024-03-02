@@ -50,7 +50,7 @@ fn toggle_debug_info(
                                 },
                                 value: "".into()
                             };
-                            3 as usize
+                            4 as usize
                         ],
                         alignment: TextAlignment::Left,
                         ..Default::default()
@@ -69,19 +69,22 @@ fn update_debug_info(
     player_query: Query<&Transform, With<Player>>,
     chunk_query: Query<(Entity, &Chunk)>,
     entities_query: Query<Entity>,
+    time: Res<Time>,
 ) {
     if let Ok((_, mut text, _)) = debug_query.get_single_mut() {
         let player_coords = player_query.get_single().unwrap().translation;
 
-        text.sections[0].value = format!(
-            "Player Coordinates: [{},{}]",
+        text.sections[0].value = format!("FPS: {:.2}", 1.0 / time.delta_seconds());
+
+        text.sections[1].value = format!(
+            "\nPlayer Coordinates: [{},{}]",
             player_coords.x, player_coords.y
         );
 
         let n_entities = entities_query.iter().collect::<Vec<_>>().len();
-        text.sections[1].value = format!("\nTotal Entities: {}", n_entities);
+        text.sections[2].value = format!("\nTotal Entities: {}", n_entities);
 
         let n_chunks = chunk_query.iter().collect::<Vec<_>>().len();
-        text.sections[2].value = format!("\nChunks Rendered: {}", n_chunks);
+        text.sections[3].value = format!("\nChunks Rendered: {}", n_chunks);
     }
 }

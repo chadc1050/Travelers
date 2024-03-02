@@ -209,6 +209,7 @@ impl Stitcher {
             self.update_constraint_map();
         }
 
+        info!("{:?}", self.tiles);
         &self.tiles
     }
 
@@ -227,7 +228,7 @@ impl Stitcher {
         }
 
         if index.is_some() {
-            info!("{:?}\n{:?}", self.constraint_map, self.adj);
+            //info!("{:?}\n{:?}", self.constraint_map, self.adj);
             info!("Entropy minima: ({})", index.unwrap());
         }
 
@@ -246,12 +247,12 @@ impl Stitcher {
                 continue;
             }
 
-            let side = idx / CHUNK_TILE_LENGTH as usize;
+            let side = idx / (CHUNK_TILE_LENGTH + 1) as usize;
 
-            let rank = idx % CHUNK_TILE_LENGTH as usize;
+            let rank = idx % (CHUNK_TILE_LENGTH + 1) as usize;
 
             // Check chunk
-            !todo!();
+            // TODO: Add chunk check
 
             // Check connecting
             if side == 0 || (side == 1 && rank == 0) {
@@ -342,7 +343,8 @@ impl Stitcher {
             if side == 0 {
                 if rank == 0 {
                     if self.tiles[self.tiles.len() - 1].is_some() {
-                        let allowed = self.schematic.tiles[&(self.tiles.len() - 1).to_string()]
+                        let allowed = self.schematic.tiles
+                            [&self.tiles[self.tiles.len() - 1].unwrap().0.to_string()]
                             .north
                             .clone();
 
@@ -350,19 +352,28 @@ impl Stitcher {
                     }
 
                     if self.tiles[idx + 1].is_some() {
-                        let allowed = self.schematic.tiles[&(idx + 1).to_string()].west.clone();
+                        let allowed = self.schematic.tiles
+                            [&self.tiles[idx + 1].unwrap().0.to_string()]
+                            .west
+                            .clone();
 
                         constraint.retain(|&to_retain| allowed.contains(&to_retain));
                     }
                 } else {
                     if self.tiles[idx - 1].is_some() {
-                        let allowed = self.schematic.tiles[&(idx + 1).to_string()].east.clone();
+                        let allowed = self.schematic.tiles
+                            [&self.tiles[idx - 1].unwrap().0.to_string()]
+                            .east
+                            .clone();
 
                         constraint.retain(|&to_retain| allowed.contains(&to_retain));
                     }
 
                     if self.tiles[idx + 1].is_some() {
-                        let allowed = self.schematic.tiles[&(idx + 1).to_string()].west.clone();
+                        let allowed = self.schematic.tiles
+                            [&self.tiles[idx + 1].unwrap().0.to_string()]
+                            .west
+                            .clone();
 
                         constraint.retain(|&to_retain| allowed.contains(&to_retain));
                     }
@@ -370,7 +381,8 @@ impl Stitcher {
             } else if side == 1 {
                 if rank == 0 {
                     if self.tiles[idx - 1].is_some() {
-                        let allowed = self.schematic.tiles[&(self.tiles.len() - 1).to_string()]
+                        let allowed = self.schematic.tiles
+                            [&self.tiles[idx - 1].unwrap().0.to_string()]
                             .north
                             .clone();
 
@@ -378,19 +390,28 @@ impl Stitcher {
                     }
 
                     if self.tiles[idx + 1].is_some() {
-                        let allowed = self.schematic.tiles[&(idx + 1).to_string()].north.clone();
+                        let allowed = self.schematic.tiles
+                            [&self.tiles[idx + 1].unwrap().0.to_string()]
+                            .north
+                            .clone();
 
                         constraint.retain(|&to_retain| allowed.contains(&to_retain));
                     }
                 } else {
                     if self.tiles[idx - 1].is_some() {
-                        let allowed = self.schematic.tiles[&(idx - 1).to_string()].south.clone();
+                        let allowed = self.schematic.tiles
+                            [&self.tiles[idx - 1].unwrap().0.to_string()]
+                            .south
+                            .clone();
 
                         constraint.retain(|&to_retain| allowed.contains(&to_retain));
                     }
 
                     if self.tiles[idx + 1].is_some() {
-                        let allowed = self.schematic.tiles[&(idx + 1).to_string()].north.clone();
+                        let allowed = self.schematic.tiles
+                            [&self.tiles[idx + 1].unwrap().0.to_string()]
+                            .north
+                            .clone();
 
                         constraint.retain(|&to_retain| allowed.contains(&to_retain));
                     }
@@ -398,25 +419,37 @@ impl Stitcher {
             } else if side == 1 {
                 if rank == 0 {
                     if self.tiles[idx - 1].is_some() {
-                        let allowed = self.schematic.tiles[&(idx - 1).to_string()].east.clone();
+                        let allowed = self.schematic.tiles
+                            [&self.tiles[idx - 1].unwrap().0.to_string()]
+                            .east
+                            .clone();
 
                         constraint.retain(|&to_retain| allowed.contains(&to_retain));
                     }
 
                     if self.tiles[idx + 1].is_some() {
-                        let allowed = self.schematic.tiles[&(idx + 1).to_string()].north.clone();
+                        let allowed = self.schematic.tiles
+                            [&self.tiles[idx + 1].unwrap().0.to_string()]
+                            .north
+                            .clone();
 
                         constraint.retain(|&to_retain| allowed.contains(&to_retain));
                     }
                 } else {
                     if self.tiles[idx - 1].is_some() {
-                        let allowed = self.schematic.tiles[&(idx - 1).to_string()].south.clone();
+                        let allowed = self.schematic.tiles
+                            [&self.tiles[idx - 1].unwrap().0.to_string()]
+                            .south
+                            .clone();
 
                         constraint.retain(|&to_retain| allowed.contains(&to_retain));
                     }
 
                     if self.tiles[idx + 1].is_some() {
-                        let allowed = self.schematic.tiles[&(idx + 1).to_string()].north.clone();
+                        let allowed = self.schematic.tiles
+                            [&self.tiles[idx + 1].unwrap().0.to_string()]
+                            .north
+                            .clone();
 
                         constraint.retain(|&to_retain| allowed.contains(&to_retain));
                     }
@@ -424,25 +457,37 @@ impl Stitcher {
             } else if side == 2 {
                 if rank == 0 {
                     if self.tiles[idx - 1].is_some() {
-                        let allowed = self.schematic.tiles[&(idx - 1).to_string()].south.clone();
+                        let allowed = self.schematic.tiles
+                            [&self.tiles[idx - 1].unwrap().0.to_string()]
+                            .south
+                            .clone();
 
                         constraint.retain(|&to_retain| allowed.contains(&to_retain));
                     }
 
                     if self.tiles[idx + 1].is_some() {
-                        let allowed = self.schematic.tiles[&(idx + 1).to_string()].east.clone();
+                        let allowed = self.schematic.tiles
+                            [&self.tiles[idx + 1].unwrap().0.to_string()]
+                            .east
+                            .clone();
 
                         constraint.retain(|&to_retain| allowed.contains(&to_retain));
                     }
                 } else {
                     if self.tiles[idx - 1].is_some() {
-                        let allowed = self.schematic.tiles[&(idx - 1).to_string()].west.clone();
+                        let allowed = self.schematic.tiles
+                            [&self.tiles[idx - 1].unwrap().0.to_string()]
+                            .west
+                            .clone();
 
                         constraint.retain(|&to_retain| allowed.contains(&to_retain));
                     }
 
                     if self.tiles[idx + 1].is_some() {
-                        let allowed = self.schematic.tiles[&(idx + 1).to_string()].east.clone();
+                        let allowed = self.schematic.tiles
+                            [&self.tiles[idx + 1].unwrap().0.to_string()]
+                            .east
+                            .clone();
 
                         constraint.retain(|&to_retain| allowed.contains(&to_retain));
                     }
@@ -450,25 +495,53 @@ impl Stitcher {
             } else if side == 3 {
                 if rank == 0 {
                     if self.tiles[idx - 1].is_some() {
-                        let allowed = self.schematic.tiles[&(idx - 1).to_string()].north.clone();
-
-                        constraint.retain(|&to_retain| allowed.contains(&to_retain));
-                    }
-
-                    if self.tiles[0].is_some() {
-                        let allowed = self.schematic.tiles["0"].south.clone();
-
-                        constraint.retain(|&to_retain| allowed.contains(&to_retain));
-                    }
-                } else {
-                    if self.tiles[idx - 1].is_some() {
-                        let allowed = self.schematic.tiles[&(idx - 1).to_string()].north.clone();
+                        let allowed = self.schematic.tiles
+                            [&self.tiles[idx - 1].unwrap().0.to_string()]
+                            .north
+                            .clone();
 
                         constraint.retain(|&to_retain| allowed.contains(&to_retain));
                     }
 
                     if self.tiles[idx + 1].is_some() {
-                        let allowed = self.schematic.tiles[&(idx + 1).to_string()].south.clone();
+                        let allowed = self.schematic.tiles[&self.tiles[0].unwrap().0.to_string()]
+                            .west
+                            .clone();
+
+                        constraint.retain(|&to_retain| allowed.contains(&to_retain));
+                    }
+                } else if rank == CHUNK_TILE_LENGTH as usize {
+                    if self.tiles[idx - 1].is_some() {
+                        let allowed = self.schematic.tiles
+                            [&self.tiles[idx - 1].unwrap().0.to_string()]
+                            .north
+                            .clone();
+
+                        constraint.retain(|&to_retain| allowed.contains(&to_retain));
+                    }
+
+                    if self.tiles[0].is_some() {
+                        let allowed = self.schematic.tiles[&self.tiles[0].unwrap().0.to_string()]
+                            .south
+                            .clone();
+
+                        constraint.retain(|&to_retain| allowed.contains(&to_retain));
+                    }
+                } else {
+                    if self.tiles[idx - 1].is_some() {
+                        let allowed = self.schematic.tiles
+                            [&self.tiles[idx - 1].unwrap().0.to_string()]
+                            .north
+                            .clone();
+
+                        constraint.retain(|&to_retain| allowed.contains(&to_retain));
+                    }
+
+                    if self.tiles[idx + 1].is_some() {
+                        let allowed = self.schematic.tiles
+                            [&self.tiles[idx + 1].unwrap().0.to_string()]
+                            .south
+                            .clone();
 
                         constraint.retain(|&to_retain| allowed.contains(&to_retain));
                     }
@@ -490,9 +563,9 @@ impl Stitcher {
         let mut constraints = vec![HashSet::new(); (4 * CHUNK_TILE_LENGTH + 4) as usize];
 
         for idx in 0..(4 * CHUNK_TILE_LENGTH + 4) {
-            let side = idx / CHUNK_TILE_LENGTH;
+            let side = idx / (CHUNK_TILE_LENGTH + 1);
 
-            let rank = idx % CHUNK_TILE_LENGTH;
+            let rank = idx % (CHUNK_TILE_LENGTH + 1);
 
             if adj.0.is_some() && (side == 0 || (side == 1 && rank == 0)) {
                 constraints[idx as usize] = unconstrained.clone();

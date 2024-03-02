@@ -11,13 +11,13 @@ mod schematic;
 
 mod wfc;
 
-const CHUNK_TILE_LENGTH: i64 = 2;
+const CHUNK_TILE_LENGTH: i64 = 8;
 const TILE_SIZE: i64 = 32;
 const CHUNK_SIZE: i64 = CHUNK_TILE_LENGTH * TILE_SIZE;
 
-const RENDER_DISTANCE: i8 = 3;
+const RENDER_DISTANCE: i8 = 1;
 
-#[derive(Copy, Clone, Default)]
+#[derive(Copy, Clone, Debug, Default)]
 struct Coords(i64, i64);
 
 impl From<&Transform> for Coords {
@@ -128,7 +128,7 @@ fn gen_chunks(
 fn gen_chunk_stitches(
     mut commands: Commands,
     chunks_query: Query<(Entity, &Chunk, &Transform, &Children)>,
-    dirty_chunks_query: Query<(Entity, &Chunk, &Transform, &Children), With<Dirty>>,
+    dirty_chunks_query: Query<(Entity, &Chunk, &Transform, &Children, &Dirty)>,
     tiles_query: Query<(Entity, &Tile, &Transform)>,
     asset_server: Res<AssetServer>,
     schematic: Res<Assets<SchematicAsset>>,
@@ -148,7 +148,7 @@ fn gen_chunk_stitches(
                 .get(&schematic_handle)
                 .expect("Error loading in schematic!");
 
-            for (entity, _, transform, children) in dirty_chunks_query.iter() {
+            for (entity, _, transform, children, _) in dirty_chunks_query.iter() {
                 // Get adjacencies to chunks
 
                 let coords = Coords::from(transform);
@@ -179,8 +179,10 @@ fn gen_chunk_stitches(
                         // Add tiles to chunk
                         for (idx, tile) in edges.iter().enumerate() {
                             if let Some((sprite_idx, _)) = tile {
-                                let side = idx / CHUNK_TILE_LENGTH as usize;
-                                let rank = idx % CHUNK_TILE_LENGTH as usize;
+                                let side = idx / (CHUNK_TILE_LENGTH + 1) as usize;
+                                let rank = idx % (CHUNK_TILE_LENGTH + 1) as usize;
+
+                                info!("Side: {:?}, Rank: {:?}", side, rank);
 
                                 // North, East, South, West
                                 let perim_tile_coords =
@@ -192,14 +194,18 @@ fn gen_chunk_stitches(
                                     ..Default::default()
                                 };
 
+                                let x_rel = (perim_tile_coords.0 - coords.0) as f32
+                                    + (TILE_SIZE as f32 / 2.);
+
+                                let y_rel = (perim_tile_coords.1 - coords.1) as f32
+                                    + (TILE_SIZE as f32 / 2.);
+
+                                info!("Spawning stitched tile to chunk ({}, {}) at relative coordinates: ({},{})", coords.0, coords.1, x_rel, y_rel);
+
                                 parent
                                     .spawn(sprite_bundle)
                                     .insert(Transform::from_translation(Vec3::new(
-                                        (perim_tile_coords.0 as f32 * TILE_SIZE as f32)
-                                            - (TILE_SIZE / 2) as f32,
-                                        (perim_tile_coords.1 as f32 * TILE_SIZE as f32)
-                                            - (TILE_SIZE / 2) as f32,
-                                        0.,
+                                        x_rel, y_rel, 0.,
                                     )))
                                     .insert(Visibility::Inherited)
                                     .insert(Tile {
@@ -287,13 +293,22 @@ fn create_chunks(
                                 ..Default::default()
                             };
 
+                            let x_rel = (-CHUNK_SIZE as f32 / 2.)
+                                + (x as f32 * TILE_SIZE as f32)
+                                + (TILE_SIZE as f32 / 2.);
+
+                            let y_rel = (-CHUNK_SIZE as f32 / 2.)
+                                + (y as f32 * TILE_SIZE as f32)
+                                + (TILE_SIZE as f32 / 2.);
+
+                            info!(
+                                "Spawning tile to chunk ({}, {}) at relative coordinates: ({},{})",
+                                in_range.0, in_range.1, x_rel, y_rel
+                            );
+
                             parent
                                 .spawn(sprite_bundle)
-                                .insert(Transform::from_translation(Vec3::new(
-                                    (x as f32 * TILE_SIZE as f32) - (TILE_SIZE / 2) as f32,
-                                    (y as f32 * TILE_SIZE as f32) - (TILE_SIZE / 2) as f32,
-                                    0.,
-                                )))
+                                .insert(Transform::from_translation(Vec3::new(x_rel, y_rel, 0.)))
                                 .insert(Visibility::Inherited)
                                 .insert(Tile { texture_id: tile.0 });
                         }
