@@ -4,12 +4,12 @@ use bevy::{log::info, transform::components::Transform};
 
 use crate::world::TILE_SIZE;
 
-use super::{schematic::SchematicAsset, Adjacencies, Coords, Tile, CHUNK_TILE_LENGTH};
+use super::{schematic::SchematicAsset, Adjacencies, ChunkCoords, Tile, CHUNK_TILE_LENGTH};
 
 use rand::Rng;
 
 pub struct Stitcher {
-    coords: Coords,
+    coords: ChunkCoords,
     schematic: SchematicAsset,
     chunk: Vec<(Tile, Transform)>,
     adj: Adjacencies,
@@ -20,7 +20,7 @@ pub struct Stitcher {
 impl Stitcher {
     pub fn init(
         schematic: &SchematicAsset,
-        coords: Coords,
+        coords: ChunkCoords,
         chunk: Vec<(Tile, Transform)>,
         adj: Adjacencies,
     ) -> Stitcher {
@@ -29,22 +29,15 @@ impl Stitcher {
             schematic: schematic.clone(),
             chunk: chunk,
             adj: adj.clone(),
-            constraint_map: Stitcher::init_stitching_constaints(schematic, adj),
+            constraint_map: Self::init_stitching_constaints(schematic, adj),
             tiles: vec![None; (4 * CHUNK_TILE_LENGTH + 4) as usize],
         }
     }
 
     pub fn stitch(&mut self) -> &Vec<Option<u8>> {
-        let mut has_next = true;
-
         // Collapse Chunk
-        while has_next {
-            if let Some(next) = self.lowest_entropy() {
-                self.tiles[next] = self.collapse_tile(next);
-            } else {
-                has_next = false;
-            }
-
+        while let Some(next) = self.lowest_entropy() {
+            self.tiles[next] = self.collapse_tile(next);
             self.update_constraint_map();
         }
 

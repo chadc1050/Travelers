@@ -17,14 +17,21 @@ const CHUNK_SIZE: i64 = CHUNK_TILE_LENGTH * TILE_SIZE;
 const RENDER_DISTANCE: i8 = 2;
 
 #[derive(Copy, Clone, Debug, Default)]
-struct Coords(i64, i64);
+struct ChunkCoords(i64, i64);
 
-impl From<&Transform> for Coords {
+impl From<&Transform> for ChunkCoords {
     fn from(value: &Transform) -> Self {
-        Coords(
+        ChunkCoords(
             (value.translation.x - (CHUNK_SIZE / 2) as f32) as i64,
             (value.translation.y - (CHUNK_SIZE / 2) as f32) as i64,
         )
+    }
+}
+
+impl PartialEq<Transform> for ChunkCoords {
+    fn eq(&self, transform: &Transform) -> bool {
+        self.0 == (transform.translation.x - (CHUNK_SIZE as f32 / 2.)) as i64
+            && self.1 == (transform.translation.y - (CHUNK_SIZE as f32 / 2.)) as i64
     }
 }
 
@@ -83,7 +90,7 @@ fn load_schematic(asset_server: Res<AssetServer>, mut commands: Commands) {
 fn gen_chunks(
     mut commands: Commands,
     cam_pos: Query<&Transform, With<Camera>>,
-    chunks: Query<(Entity, &Chunk, &Transform, &Children)>,
+    chunks: Query<(Entity, &Transform, &Children), With<Chunk>>,
     asset_server: Res<AssetServer>,
     schematic: Res<Assets<SchematicAsset>>,
     atlas_asset: ResMut<Assets<TextureAtlas>>,
@@ -126,8 +133,8 @@ fn gen_chunks(
 
 fn gen_chunk_stitches(
     mut commands: Commands,
-    chunks_query: Query<(Entity, &Chunk, &Transform, &Children)>,
-    dirty_chunks_query: Query<(Entity, &Chunk, &Transform, &Children, &Dirty)>,
+    chunks_query: Query<(Entity, &Transform, &Children), With<Chunk>>,
+    dirty_chunks_query: Query<(Entity, &Transform, &Children), (With<Dirty>, With<Chunk>)>,
     tiles_query: Query<(Entity, &Tile, &Transform)>,
     asset_server: Res<AssetServer>,
     schematic: Res<Assets<SchematicAsset>>,
@@ -147,15 +154,18 @@ fn gen_chunk_stitches(
                 .get(&schematic_handle)
                 .expect("Error loading in schematic!");
 
-            for (entity, _, transform, children, _) in dirty_chunks_query.iter() {
+            for (entity, transform, children) in dirty_chunks_query.iter() {
                 // Get adjacencies to chunks
 
-                let coords = Coords::from(transform);
+                let coords = ChunkCoords::from(transform);
 
-                let chunk = get_chunk_tiles((entity, children), &tiles_query);
+                let chunk = get_chunk_tiles(children, &tiles_query);
 
-                let adj =
-                    get_connected_chunks(&Coords::from(transform), &chunks_query, &tiles_query);
+                let adj = get_connected_chunks(
+                    &ChunkCoords::from(transform),
+                    &chunks_query,
+                    &tiles_query,
+                );
 
                 // Stitch together chunk with neighbors
                 let mut stitcher = Stitcher::init(schematic, coords, chunk, adj);
@@ -222,8 +232,8 @@ fn gen_chunk_stitches(
 }
 
 fn create_chunks(
-    chunks_in_range: &Vec<Coords>,
-    chunks: &Query<(Entity, &Chunk, &Transform, &Children)>,
+    chunks_in_range: &Vec<ChunkCoords>,
+    chunks: &Query<(Entity, &Transform, &Children), With<Chunk>>,
     schematic: Res<Assets<SchematicAsset>>,
     schematic_handle: Handle<SchematicAsset>,
     image_handle: Handle<Image>,
@@ -232,10 +242,8 @@ fn create_chunks(
 ) {
     for in_range in chunks_in_range {
         let mut present = false;
-        for (_, _, transform, _) in chunks.iter() {
-            if in_range.0 == (transform.translation.x - (CHUNK_SIZE as f32 / 2.)) as i64
-                && in_range.1 == (transform.translation.y - (CHUNK_SIZE as f32 / 2.)) as i64
-            {
+        for (_, transform, _) in chunks.iter() {
+            if in_range == transform {
                 present = true;
                 break;
             }
@@ -319,20 +327,13 @@ fn create_chunks(
 }
 
 fn remove_stale_chunks(
-    chunks_in_range: &Vec<Coords>,
-    chunks: &Query<(Entity, &Chunk, &Transform, &Children)>,
+    chunks_in_range: &Vec<ChunkCoords>,
+    chunks: &Query<(Entity, &Transform, &Children), With<Chunk>>,
     commands: &mut Commands,
 ) {
-    for (entity, _, transform, _) in chunks.iter() {
-        let mut is_stale = true;
-        for in_range in chunks_in_range {
-            if (transform.translation.x - (CHUNK_SIZE as f32 / 2.)) as i64 == in_range.0
-                && (transform.translation.y - (CHUNK_SIZE as f32 / 2.)) as i64 == in_range.1
-            {
-                is_stale = false;
-                break;
-            }
-        }
+    for (entity, transform, _) in chunks.iter() {
+        let is_stale = chunks_in_range.iter().all(|in_range| in_range != transform);
+
         if is_stale {
             info!(
                 "Removing out of range chunk: ({},{})",
@@ -345,29 +346,26 @@ fn remove_stale_chunks(
 }
 
 fn get_connected_chunks(
-    coords: &Coords,
-    chunks: &Query<(Entity, &Chunk, &Transform, &Children)>,
+    coords: &ChunkCoords,
+    chunks: &Query<(Entity, &Transform, &Children), With<Chunk>>,
     tiles: &Query<(Entity, &Tile, &Transform)>,
 ) -> Adjacencies {
     let (mut north, mut east, mut south, mut west) =
         (Option::None, Option::None, Option::None, Option::None);
 
-    for (entity, _, transform, children) in chunks.iter() {
-        let to_check = (
-            (transform.translation.x - (CHUNK_SIZE as f32 / 2.)) as i64,
-            (transform.translation.y - (CHUNK_SIZE as f32 / 2.)) as i64,
-        );
+    for (_, transform, children) in chunks.iter() {
+        let to_check = ChunkCoords::from(transform);
 
         debug!("Checking adjacenties for ({},{})", to_check.0, to_check.1);
 
         if coords.0 == to_check.0 && coords.1 + CHUNK_SIZE + TILE_SIZE == to_check.1 {
-            north = Some(get_chunk_tiles((entity, children), tiles));
+            north = Some(get_chunk_tiles(children, tiles));
         } else if coords.0 + CHUNK_SIZE + TILE_SIZE == to_check.0 && coords.1 == to_check.1 {
-            east = Some(get_chunk_tiles((entity, children), tiles));
+            east = Some(get_chunk_tiles(children, tiles));
         } else if coords.0 - CHUNK_SIZE - TILE_SIZE == to_check.0 && coords.1 == to_check.1 {
-            south = Some(get_chunk_tiles((entity, children), tiles));
+            south = Some(get_chunk_tiles(children, tiles));
         } else if coords.0 == to_check.0 && coords.1 - CHUNK_SIZE - TILE_SIZE == to_check.1 {
-            west = Some(get_chunk_tiles((entity, children), tiles));
+            west = Some(get_chunk_tiles(children, tiles));
         }
     }
 
@@ -375,12 +373,12 @@ fn get_connected_chunks(
 }
 
 fn get_chunk_tiles(
-    chunk_children: (Entity, &Children),
+    chunk_children: &Children,
     tiles: &Query<(Entity, &Tile, &Transform)>,
 ) -> Vec<(Tile, Transform)> {
     let mut containing: Vec<(Tile, Transform)> = Vec::new();
 
-    for child in chunk_children.1.iter() {
+    for child in chunk_children.iter() {
         debug!("Found child");
         if let Ok((_, tile, transform)) = tiles.get(*child) {
             containing.push((tile.clone(), transform.clone()));
@@ -391,17 +389,17 @@ fn get_chunk_tiles(
 }
 
 // Get coords of chunks that are in the range of the camera, should account for chunk stitching
-fn get_chunks_in_range(pos: (f32, f32)) -> Vec<Coords> {
+fn get_chunks_in_range(pos: (f32, f32)) -> Vec<ChunkCoords> {
     // Inverse linear equation to get offset with floor
     let offset_x = ((pos.0 as f32 - TILE_SIZE as f32) / (CHUNK_SIZE + TILE_SIZE) as f32).floor();
     let offset_y = ((pos.1 as f32 - TILE_SIZE as f32) / (CHUNK_SIZE + TILE_SIZE) as f32).floor();
 
-    let mut coords = vec![Coords::default(); ((2 * RENDER_DISTANCE) ^ 2) as usize];
+    let mut coords = vec![ChunkCoords::default(); ((2 * RENDER_DISTANCE) ^ 2) as usize];
 
     // Feed offset back into linear equation and extrapolate to the render distance
     for x in -RENDER_DISTANCE..=RENDER_DISTANCE {
         for y in -RENDER_DISTANCE..=RENDER_DISTANCE {
-            coords.push(Coords(
+            coords.push(ChunkCoords(
                 ((offset_x as i64 + x as i64) * (CHUNK_SIZE + TILE_SIZE)) - TILE_SIZE,
                 ((offset_y as i64 + y as i64) * (CHUNK_SIZE + TILE_SIZE)) - TILE_SIZE,
             ));
@@ -411,21 +409,21 @@ fn get_chunks_in_range(pos: (f32, f32)) -> Vec<Coords> {
     coords
 }
 
-fn get_perimeter_world_coord(coords: &Coords, side: i64, rank: i64) -> Coords {
+fn get_perimeter_world_coord(coords: &ChunkCoords, side: i64, rank: i64) -> ChunkCoords {
     match side {
-        0 => Coords(
+        0 => ChunkCoords(
             coords.0 - TILE_SIZE + (rank * TILE_SIZE),
             coords.1 + CHUNK_SIZE,
         ),
-        1 => Coords(
+        1 => ChunkCoords(
             coords.0 + CHUNK_SIZE,
             coords.1 + CHUNK_SIZE - (rank * TILE_SIZE),
         ),
-        2 => Coords(
+        2 => ChunkCoords(
             coords.0 + CHUNK_SIZE - (rank * TILE_SIZE),
             coords.1 - TILE_SIZE,
         ),
-        _ => Coords(
+        _ => ChunkCoords(
             coords.0 - TILE_SIZE,
             coords.1 - TILE_SIZE + (rank * TILE_SIZE),
         ),

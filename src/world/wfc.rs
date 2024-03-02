@@ -5,12 +5,10 @@ use std::{
 
 use bevy::log::info;
 
-use super::{schematic::SchematicAsset, Coords, CHUNK_TILE_LENGTH};
+use super::{schematic::SchematicAsset, ChunkCoords, CHUNK_TILE_LENGTH};
 
 use rand::{Rng, SeedableRng};
 
-// https://gist.github.com/jdah/ad997b858513a278426f8d91317115b9
-// https://gamedev.stackexchange.com/questions/188719/deterministic-procedural-wave-function-collapse
 pub struct WaveFunctionCollapse {
     hash: u64,
     schematic: SchematicAsset,
@@ -22,7 +20,7 @@ impl WaveFunctionCollapse {
     pub fn init(
         world_seed: u64,
         schematic: &SchematicAsset,
-        coords: Coords,
+        coords: ChunkCoords,
     ) -> WaveFunctionCollapse {
         WaveFunctionCollapse {
             hash: Self::get_hash(world_seed, &coords),
@@ -39,19 +37,12 @@ impl WaveFunctionCollapse {
     }
 
     pub fn collapse(&mut self) -> &Vec<Vec<Option<u8>>> {
-        // Generate bottom left of chunk
+        // Generate bottom left of tile of chunk
         self.tiles[0][0] = self.scratch();
 
-        let mut has_next = true;
-
         // Collapse Chunk
-        while has_next {
-            if let Some(next) = self.lowest_entropy() {
-                self.tiles[next.0][next.1] = self.collapse_tile(next);
-            } else {
-                has_next = false;
-            }
-
+        while let Some(next) = self.lowest_entropy() {
+            self.tiles[next.0][next.1] = self.collapse_tile(next);
             self.update_constraint_map();
         }
 
@@ -153,7 +144,7 @@ impl WaveFunctionCollapse {
         Some(available.iter().nth(rand.into()).unwrap().clone())
     }
 
-    fn get_hash(world_seed: u64, coords: &Coords) -> u64 {
+    fn get_hash(world_seed: u64, coords: &ChunkCoords) -> u64 {
         let mut hasher = DefaultHasher::new();
         (coords.0 + coords.1 + world_seed as i64).hash(&mut hasher);
         hasher.finish()
