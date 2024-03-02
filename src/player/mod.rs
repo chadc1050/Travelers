@@ -65,8 +65,8 @@ fn player_spawn_system(
 }
 
 fn camera_follow(
-    player_query: Query<(&Player, &Transform)>,
-    mut camera_query: Query<(&mut Transform, &Camera)>,
+    player_query: Query<(&Player, &Transform), Without<Camera>>,
+    mut camera_query: Query<(&mut Transform, &Camera), Without<Player>>,
 ) {
     if let Ok((mut cam_transform, _)) = camera_query.get_single_mut() {
         if let Ok((_, player_transform)) = player_query.get_single() {
