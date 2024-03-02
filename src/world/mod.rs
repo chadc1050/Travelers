@@ -177,7 +177,7 @@ fn gen_chunk_stitches(
                     .with_children(|parent| {
                         // Add tiles to chunk
                         for (idx, tile) in edges.iter().enumerate() {
-                            if let Some((sprite_idx, _)) = tile {
+                            if let Some(sprite_idx) = tile {
                                 let side = idx / (CHUNK_TILE_LENGTH + 1) as usize;
                                 let rank = idx % (CHUNK_TILE_LENGTH + 1) as usize;
 
@@ -290,7 +290,7 @@ fn create_chunks(
                         if let Some(tile) = tiles[x as usize][y as usize] {
                             let sprite_bundle = SpriteSheetBundle {
                                 texture_atlas: atlas_handle.clone(),
-                                sprite: TextureAtlasSprite::new(tile.0 as usize),
+                                sprite: TextureAtlasSprite::new(tile as usize),
                                 ..Default::default()
                             };
 
@@ -309,7 +309,7 @@ fn create_chunks(
                                 .spawn(sprite_bundle)
                                 .insert(Transform::from_translation(Vec3::new(x_rel, y_rel, 0.)))
                                 .insert(Visibility::Inherited)
-                                .insert(Tile { texture_id: tile.0 });
+                                .insert(Tile { texture_id: tile });
                         }
                     }
                 }
