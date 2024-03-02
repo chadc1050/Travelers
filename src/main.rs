@@ -2,6 +2,7 @@ use bevy::{
     app::{Startup, Update},
     core_pipeline::core_2d::Camera2dBundle,
     prelude::*,
+    window::{WindowMode, WindowTheme},
 };
 use components::{Dead, Health, Velocity};
 
@@ -19,6 +20,7 @@ fn main() {
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 title: "Travelers".into(),
+                mode: WindowMode::Fullscreen,
                 ..default()
             }),
             ..default()

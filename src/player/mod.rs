@@ -19,6 +19,8 @@ use crate::components::{Direction, Health, Velocity};
 
 use crate::player::inventory::Inventory;
 
+use self::inventory::InventoryPlugin;
+
 mod inventory;
 
 #[derive(Component)]
@@ -30,9 +32,10 @@ pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, player_spawn_system);
-        app.add_systems(Update, camera_follow);
-        app.add_systems(Update, player_movement);
+        app.add_plugins(InventoryPlugin)
+            .add_systems(Startup, player_spawn_system)
+            .add_systems(Update, camera_follow)
+            .add_systems(Update, player_movement);
     }
 }
 
@@ -57,7 +60,6 @@ fn player_spawn_system(
         .insert(Velocity { dx: 0., dy: 0. })
         .insert(Transform::from_translation(Vec3::new(0., 0., 1.)))
         .insert(Direction::Right)
-        .insert(Inventory { items: Vec::new() })
         .insert(Health {
             current: 100,
             max: 100,

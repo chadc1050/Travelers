@@ -212,8 +212,8 @@ impl Stitcher {
 
                     for (tile, transform) in west.iter() {
                         // Convert tile to world coords
-                        if (transform.translation.x - (TILE_SIZE as f32 / 2.)) as i64
-                            == perim_world_coords.0 + TILE_SIZE
+                        if (transform.translation.x - (TILE_SIZE as f32 / 2.)) as i64 + TILE_SIZE
+                            == perim_world_coords.0
                             && (transform.translation.y - (TILE_SIZE as f32 / 2.)) as i64
                                 == perim_world_coords.1
                         {
@@ -277,40 +277,6 @@ impl Stitcher {
                     if self.tiles[idx + 1].is_some() {
                         let allowed = self.schematic.tiles[&self.tiles[idx + 1].unwrap()]
                             .west
-                            .clone();
-
-                        constraint.retain(|&to_retain| allowed.contains(&to_retain));
-                    }
-                }
-            } else if side == 1 {
-                if rank == 0 {
-                    if self.tiles[idx - 1].is_some() {
-                        let allowed = self.schematic.tiles[&self.tiles[idx - 1].unwrap()]
-                            .north
-                            .clone();
-
-                        constraint.retain(|&to_retain| allowed.contains(&to_retain));
-                    }
-
-                    if self.tiles[idx + 1].is_some() {
-                        let allowed = self.schematic.tiles[&self.tiles[idx + 1].unwrap()]
-                            .north
-                            .clone();
-
-                        constraint.retain(|&to_retain| allowed.contains(&to_retain));
-                    }
-                } else {
-                    if self.tiles[idx - 1].is_some() {
-                        let allowed = self.schematic.tiles[&self.tiles[idx - 1].unwrap()]
-                            .south
-                            .clone();
-
-                        constraint.retain(|&to_retain| allowed.contains(&to_retain));
-                    }
-
-                    if self.tiles[idx + 1].is_some() {
-                        let allowed = self.schematic.tiles[&self.tiles[idx + 1].unwrap()]
-                            .north
                             .clone();
 
                         constraint.retain(|&to_retain| allowed.contains(&to_retain));
@@ -388,14 +354,14 @@ impl Stitcher {
                 if rank == 0 {
                     if self.tiles[idx - 1].is_some() {
                         let allowed = self.schematic.tiles[&self.tiles[idx - 1].unwrap()]
-                            .north
+                            .west
                             .clone();
 
                         constraint.retain(|&to_retain| allowed.contains(&to_retain));
                     }
 
                     if self.tiles[idx + 1].is_some() {
-                        let allowed = self.schematic.tiles[&self.tiles[0].unwrap()].west.clone();
+                        let allowed = self.schematic.tiles[&self.tiles[0].unwrap()].south.clone();
 
                         constraint.retain(|&to_retain| allowed.contains(&to_retain));
                     }

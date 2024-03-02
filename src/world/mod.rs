@@ -83,7 +83,7 @@ fn load_schematic(asset_server: Res<AssetServer>, mut commands: Commands) {
     commands.insert_resource(SchematicResource(schematic_handle));
 
     // Load textures
-    let sprite_sheet_handle = asset_server.load::<Image>("world/terrain_1.png");
+    let sprite_sheet_handle = asset_server.load::<Image>("sprites/world/terrain/terrain_1.png");
     commands.insert_resource(ImageResource(sprite_sheet_handle));
 }
 
@@ -99,7 +99,9 @@ fn gen_chunks(
 
     // Retrieve assets
     if let Some(schematic_handle) = asset_server.get_handle::<SchematicAsset>("schematic.json") {
-        if let Some(image_handle) = asset_server.get_handle::<Image>("world/terrain_1.png") {
+        if let Some(image_handle) =
+            asset_server.get_handle::<Image>("sprites/world/terrain/terrain_1.png")
+        {
             debug!("Scematic loaded");
 
             // Get Chunks in range
@@ -144,7 +146,9 @@ fn gen_chunk_stitches(
 
     // Retrieve assets
     if let Some(schematic_handle) = asset_server.get_handle::<SchematicAsset>("schematic.json") {
-        if let Some(image_handle) = asset_server.get_handle::<Image>("world/terrain_1.png") {
+        if let Some(image_handle) =
+            asset_server.get_handle::<Image>("sprites/world/terrain/terrain_1.png")
+        {
             if dirty_chunks_query.is_empty() {
                 debug!("No chunks needing to be stitched.");
                 return;
@@ -191,7 +195,7 @@ fn gen_chunk_stitches(
                                 let side = idx / (CHUNK_TILE_LENGTH + 1) as usize;
                                 let rank = idx % (CHUNK_TILE_LENGTH + 1) as usize;
 
-                                info!("Side: {:?}, Rank: {:?}", side, rank);
+                                debug!("Side: {:?}, Rank: {:?}", side, rank);
 
                                 // North, East, South, West
                                 let perim_tile_coords =
@@ -211,7 +215,7 @@ fn gen_chunk_stitches(
                                     + (TILE_SIZE as f32 / 2.)
                                     - (CHUNK_SIZE as f32 / 2.);
 
-                                info!("Spawning stitched tile to chunk ({}, {}) at relative coordinates: ({},{})", coords.0, coords.1, x_rel, y_rel);
+                                debug!("Spawning stitched tile to chunk ({}, {}) at relative coordinates: ({},{})", coords.0, coords.1, x_rel, y_rel);
 
                                 parent
                                     .spawn(sprite_bundle)
@@ -308,7 +312,7 @@ fn create_chunks(
                             let y_rel = (y as f32 * TILE_SIZE as f32) + (TILE_SIZE as f32 / 2.)
                                 - (CHUNK_SIZE as f32 / 2.);
 
-                            info!(
+                            debug!(
                                 "Spawning tile to chunk ({}, {}) at relative coordinates: ({},{})",
                                 in_range.0, in_range.1, x_rel, y_rel
                             );
