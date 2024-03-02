@@ -251,10 +251,7 @@ impl Stitcher {
 
             let rank = idx % (CHUNK_TILE_LENGTH + 1) as usize;
 
-            // Check chunk
-            // TODO: Add chunk check
-
-            // Check connecting
+            // Check chunk and connecting chunks
             if side == 0 || (side == 1 && rank == 0) {
                 if let Some(north) = &self.adj.0 {
                     let perim_world_coords =
@@ -266,6 +263,30 @@ impl Stitcher {
                             == perim_world_coords.0
                             && (transform.translation.y - (TILE_SIZE as f32 / 2.)) as i64
                                 - TILE_SIZE
+                                == perim_world_coords.1
+                        {
+                            let allowed = self.schematic.tiles[&tile.texture_id.to_string()]
+                                .south
+                                .clone();
+
+                            constraint.retain(|&to_retain| allowed.contains(&to_retain));
+                        }
+                    }
+                }
+
+                if rank != 0 {
+                    // Not a corner, check the chunk
+                    for (tile, transform) in self.chunk.iter() {
+                        let perim_world_coords = super::get_perimeter_world_coord(
+                            &self.coords,
+                            side as i64,
+                            rank as i64,
+                        );
+
+                        if (transform.translation.x - (TILE_SIZE as f32 / 2.)) as i64
+                            == perim_world_coords.0
+                            && (transform.translation.y - (TILE_SIZE as f32 / 2.)) as i64
+                                + TILE_SIZE
                                 == perim_world_coords.1
                         {
                             let allowed = self.schematic.tiles[&tile.texture_id.to_string()]
@@ -296,6 +317,29 @@ impl Stitcher {
                         }
                     }
                 }
+
+                if rank != 0 {
+                    // Not a corner, check the chunk
+                    for (tile, transform) in self.chunk.iter() {
+                        let perim_world_coords = super::get_perimeter_world_coord(
+                            &self.coords,
+                            side as i64,
+                            rank as i64,
+                        );
+
+                        if (transform.translation.x - (TILE_SIZE as f32 / 2.)) as i64 + TILE_SIZE
+                            == perim_world_coords.0
+                            && (transform.translation.y - (TILE_SIZE as f32 / 2.)) as i64
+                                == perim_world_coords.1
+                        {
+                            let allowed = self.schematic.tiles[&tile.texture_id.to_string()]
+                                .south
+                                .clone();
+
+                            constraint.retain(|&to_retain| allowed.contains(&to_retain));
+                        }
+                    }
+                }
             } else if side == 2 || (side == 3 && rank == 0) {
                 if let Some(south) = &self.adj.2 {
                     let perim_world_coords =
@@ -317,6 +361,30 @@ impl Stitcher {
                         }
                     }
                 }
+
+                if rank != 0 {
+                    // Not a corner, check the chunk
+                    for (tile, transform) in self.chunk.iter() {
+                        let perim_world_coords = super::get_perimeter_world_coord(
+                            &self.coords,
+                            side as i64,
+                            rank as i64,
+                        );
+
+                        if (transform.translation.x - (TILE_SIZE as f32 / 2.)) as i64
+                            == perim_world_coords.0
+                            && (transform.translation.y - (TILE_SIZE as f32 / 2.)) as i64
+                                - TILE_SIZE
+                                == perim_world_coords.1
+                        {
+                            let allowed = self.schematic.tiles[&tile.texture_id.to_string()]
+                                .south
+                                .clone();
+
+                            constraint.retain(|&to_retain| allowed.contains(&to_retain));
+                        }
+                    }
+                }
             } else if side == 3 || (side == 0 && rank == 0) {
                 if let Some(west) = &self.adj.3 {
                     let perim_world_coords =
@@ -331,6 +399,29 @@ impl Stitcher {
                         {
                             let allowed = self.schematic.tiles[&tile.texture_id.to_string()]
                                 .east
+                                .clone();
+
+                            constraint.retain(|&to_retain| allowed.contains(&to_retain));
+                        }
+                    }
+                }
+
+                if rank != 0 {
+                    // Not a corner, check the chunk
+                    for (tile, transform) in self.chunk.iter() {
+                        let perim_world_coords = super::get_perimeter_world_coord(
+                            &self.coords,
+                            side as i64,
+                            rank as i64,
+                        );
+
+                        if (transform.translation.x - (TILE_SIZE as f32 / 2.)) as i64 - TILE_SIZE
+                            == perim_world_coords.0
+                            && (transform.translation.y - (TILE_SIZE as f32 / 2.)) as i64
+                                == perim_world_coords.1
+                        {
+                            let allowed = self.schematic.tiles[&tile.texture_id.to_string()]
+                                .south
                                 .clone();
 
                             constraint.retain(|&to_retain| allowed.contains(&to_retain));

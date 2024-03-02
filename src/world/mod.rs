@@ -15,7 +15,7 @@ const CHUNK_TILE_LENGTH: i64 = 8;
 const TILE_SIZE: i64 = 32;
 const CHUNK_SIZE: i64 = CHUNK_TILE_LENGTH * TILE_SIZE;
 
-const RENDER_DISTANCE: i8 = 1;
+const RENDER_DISTANCE: i8 = 2;
 
 #[derive(Copy, Clone, Debug, Default)]
 struct Coords(i64, i64);
