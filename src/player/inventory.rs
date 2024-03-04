@@ -1,6 +1,4 @@
-use bevy::{prelude::*, render::view::Layer};
-
-use super::Player;
+use bevy::prelude::*;
 
 #[derive(Clone, Copy, Component)]
 pub struct Inventory;
@@ -15,7 +13,7 @@ pub struct InventoryPlugin;
 impl Plugin for InventoryPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, initialize_inventory)
-            .add_systems(Update, inventory_position_system)
+            // .add_systems(Update, inventory_position_system)
             .add_systems(Update, toggle_inventory_system);
     }
 }
@@ -25,31 +23,41 @@ fn initialize_inventory(mut commands: Commands, assets: Res<AssetServer>) {
 
     let texture_handle = assets.load::<Image>("sprites/display/items/inventory.png");
 
-    let bundle = SpriteBundle {
-        texture: texture_handle,
-        transform: Transform {
-            translation: Vec3::new(0., 0., 10.),
-            scale: Vec3::new(1.5, 1.5, 1.0),
+    let container_node = NodeBundle {
+        style: Style {
+            width: Val::Percent(100.0),
+            height: Val::Percent(100.0),
+            align_items: AlignItems::Center,
+            justify_content: JustifyContent::Center,
+            ..default()
+        },
+        ..default()
+    };
+
+    let image_bundle = ImageBundle {
+        image: UiImage {
+            texture: texture_handle,
+            ..Default::default()
+        },
+        style: Style {
+            width: Val::Vw(20.),
             ..Default::default()
         },
         ..Default::default()
     };
 
-    commands
-        .spawn(bundle)
+    let container = commands
+        .spawn(container_node)
         .insert(Visibility::Hidden)
-        .insert(Inventory {});
-}
+        .insert(Inventory {})
+        .id();
 
-fn inventory_position_system(
-    mut inventory_query: Query<(Entity, &mut Transform), With<Inventory>>,
-    camera_query: Query<(&mut Transform, &Camera), Without<Inventory>>,
-) {
-    if let Ok((cam_transform, _)) = camera_query.get_single() {
-        if let Ok((_, mut inventoy_transform)) = inventory_query.get_single_mut() {
-            inventoy_transform.translation = cam_transform.translation;
-        }
-    }
+    let sprite: Entity = commands
+        .spawn(image_bundle)
+        .insert(Visibility::Inherited)
+        .id();
+
+    commands.entity(container).push_children(&[sprite]);
 }
 
 fn toggle_inventory_system(
