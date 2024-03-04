@@ -189,44 +189,59 @@ fn gen_chunk_stitches(
                 commands
                     .entity(entity)
                     .with_children(|parent| {
+                        
                         // Add tiles to chunk
                         for (idx, tile) in edges.iter().enumerate() {
-                            if let Some(sprite_idx) = tile {
-                                let side = idx / (CHUNK_TILE_LENGTH + 1) as usize;
-                                let rank = idx % (CHUNK_TILE_LENGTH + 1) as usize;
 
-                                debug!("Side: {:?}, Rank: {:?}", side, rank);
+                            let tile_id: u8;
 
-                                // North, East, South, West
-                                let perim_tile_coords =
-                                    get_perimeter_world_coord(&coords, side as i64, rank as i64);
+                            let side = idx / (CHUNK_TILE_LENGTH + 1) as usize;
+                            let rank = idx % (CHUNK_TILE_LENGTH + 1) as usize;
 
-                                let sprite_bundle = SpriteSheetBundle {
-                                    texture_atlas: atlas_handle.clone(),
-                                    sprite: TextureAtlasSprite::new(*sprite_idx as usize),
-                                    ..Default::default()
-                                };
+                            debug!("Side: {:?}, Rank: {:?}", side, rank);
 
-                                let x_rel = (perim_tile_coords.0 - coords.0) as f32
-                                    + (TILE_SIZE as f32 / 2.)
-                                    - (CHUNK_SIZE as f32 / 2.);
+                            // North, East, South, West
+                            let perim_tile_coords = get_perimeter_world_coord(&coords, side as i64, rank as i64);
 
-                                let y_rel = (perim_tile_coords.1 - coords.1) as f32
-                                    + (TILE_SIZE as f32 / 2.)
-                                    - (CHUNK_SIZE as f32 / 2.);
+                            let x_rel = (perim_tile_coords.0 - coords.0) as f32
+                                + (TILE_SIZE as f32 / 2.)
+                                - (CHUNK_SIZE as f32 / 2.);
 
+                            let y_rel = (perim_tile_coords.1 - coords.1) as f32
+                                + (TILE_SIZE as f32 / 2.)
+                                - (CHUNK_SIZE as f32 / 2.);
+
+                            if tile.is_some() {
+    
+                                tile_id = tile.unwrap();
+            
                                 debug!("Spawning stitched tile to chunk ({}, {}) at relative coordinates: ({},{})", coords.0, coords.1, x_rel, y_rel);
+        
+                            } else {
+            
+                                tile_id = schematic.not_found;
 
-                                parent
-                                    .spawn(sprite_bundle)
-                                    .insert(Transform::from_translation(Vec3::new(
-                                        x_rel, y_rel, 0.,
-                                    )))
-                                    .insert(Visibility::Inherited)
-                                    .insert(Tile {
-                                        texture_id: *sprite_idx,
-                                    });
+                                warn!(
+                                    "Spawning stitched tile without texture to chunk ({}, {}) at relative coordinates: ({},{})",
+                                    coords.0, coords.1, x_rel, y_rel
+                                );
                             }
+
+                            let sprite_bundle = SpriteSheetBundle {
+                                texture_atlas: atlas_handle.clone(),
+                                sprite: TextureAtlasSprite::new(tile_id as usize),
+                                ..Default::default()
+                            };
+
+                            parent
+                                .spawn(sprite_bundle)
+                                .insert(Transform::from_translation(Vec3::new(
+                                    x_rel, y_rel, 0.,
+                                )))
+                                .insert(Visibility::Inherited)
+                                .insert(Tile {
+                                    texture_id: tile_id,
+                            });
                         }
                     })
                     .remove::<Dirty>();
@@ -299,30 +314,47 @@ fn create_chunks(
             commands.spawn(chunk_bundle).with_children(|parent| {
                 for x in 0..CHUNK_TILE_LENGTH {
                     for y in 0..CHUNK_TILE_LENGTH {
-                        if let Some(tile) = tiles[x as usize][y as usize] {
-                            let sprite_bundle = SpriteSheetBundle {
-                                texture_atlas: atlas_handle.clone(),
-                                sprite: TextureAtlasSprite::new(tile as usize),
-                                ..Default::default()
-                            };
+                        let x_rel = (x as f32 * TILE_SIZE as f32) + (TILE_SIZE as f32 / 2.)
+                            - (CHUNK_SIZE as f32 / 2.);
 
-                            let x_rel = (x as f32 * TILE_SIZE as f32) + (TILE_SIZE as f32 / 2.)
-                                - (CHUNK_SIZE as f32 / 2.);
+                        let y_rel = (y as f32 * TILE_SIZE as f32) + (TILE_SIZE as f32 / 2.)
+                            - (CHUNK_SIZE as f32 / 2.);
 
-                            let y_rel = (y as f32 * TILE_SIZE as f32) + (TILE_SIZE as f32 / 2.)
-                                - (CHUNK_SIZE as f32 / 2.);
+                        let tile_id: u8;
+
+                        let collapsed = tiles[x as usize][y as usize];
+                        if collapsed.is_some() {
+
+                            tile_id = collapsed.unwrap();
 
                             debug!(
                                 "Spawning tile to chunk ({}, {}) at relative coordinates: ({},{})",
                                 in_range.0, in_range.1, x_rel, y_rel
                             );
 
-                            parent
-                                .spawn(sprite_bundle)
-                                .insert(Transform::from_translation(Vec3::new(x_rel, y_rel, 0.)))
-                                .insert(Visibility::Inherited)
-                                .insert(Tile { texture_id: tile });
+                        } else {
+
+                            tile_id = schematic.not_found;
+
+                            warn!(
+                                "Spawning tile without texture to chunk ({}, {}) at relative coordinates: ({},{})",
+                                in_range.0, in_range.1, x_rel, y_rel
+                            );
                         }
+
+                        let sprite_bundle = SpriteSheetBundle {
+                            texture_atlas: atlas_handle.clone(),
+                            sprite: TextureAtlasSprite::new(tile_id as usize),
+                            ..Default::default()
+                        };
+
+                        parent
+                            .spawn(sprite_bundle)
+                            .insert(Transform::from_translation(Vec3::new(x_rel, y_rel, 0.)))
+                            .insert(Visibility::Inherited)
+                            .insert(Tile {
+                                texture_id: tile_id,
+                            });
                     }
                 }
             });

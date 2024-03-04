@@ -8,11 +8,17 @@ use bevy::{
 
 use serde::Deserialize;
 
-// TODO: Have the hashmap deserialize to a u8 key instead of a string.
-#[derive(Asset, Clone, Debug, TypePath, Deserialize)]
+#[derive(Asset, Clone, Debug, TypePath)]
 pub struct SchematicAsset {
-    #[serde(flatten)]
+    pub not_found: u8,
     pub tiles: HashMap<u8, TileSchematic>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct SchematicJson {
+    pub not_found: u8,
+    #[serde(flatten)]
+    pub tiles: HashMap<String, TileSchematic>,
 }
 
 #[derive(Resource)]
@@ -52,7 +58,7 @@ impl AssetLoader for SchematicLoader {
         Box::pin(async move {
             let mut bytes = Vec::new();
             _ = reader.read_to_end(&mut bytes).await;
-            let serialized = serde_json::from_slice::<HashMap<String, TileSchematic>>(&bytes);
+            let serialized = serde_json::from_slice::<SchematicJson>(&bytes);
 
             match serialized {
                 Ok(data) => {
@@ -60,11 +66,14 @@ impl AssetLoader for SchematicLoader {
 
                     let mut cnv = HashMap::new();
 
-                    for (key, val) in data {
+                    for (key, val) in data.tiles {
                         cnv.insert(key.parse::<u8>().unwrap(), val);
                     }
 
-                    Ok(SchematicAsset { tiles: cnv })
+                    Ok(SchematicAsset {
+                        not_found: data.not_found,
+                        tiles: cnv,
+                    })
                 }
                 Err(err) => Err(Self::Error::new(
                     ErrorKind::InvalidData,
